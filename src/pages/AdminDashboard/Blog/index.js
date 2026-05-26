@@ -1,0 +1,428 @@
+import React, { useState, useEffect } from 'react';
+import { Container, Row, Col, Card, Button, Table, Modal, Form, Spinner } from 'react-bootstrap';
+import { ToastContainer, toast } from 'react-toastify';
+import 'react-toastify/dist/ReactToastify.css';
+import { getAllBlogsAdmin, addBlog, updateBlog, deleteBlog, toggleBlogStatus } from '../../../helper/blog_helper';
+import ConfirmModal from '../../../components/ConfirmModal';
+import Header from '../../../layouts/Header';
+import Footer from '../../../layouts/Footer';
+import ReactQuill from 'react-quill';
+import 'react-quill/dist/quill.snow.css';
+
+const BlogEditor = () => {
+    const [blogs, setBlogs] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [showModal, setShowModal] = useState(false);
+    const [isEditing, setIsEditing] = useState(false);
+    const [currentBlog, setCurrentBlog] = useState(null);
+    const [formData, setFormData] = useState({
+        title: '',
+        desc: '',
+        image: null,
+        isActive: true
+    });
+    const [submitting, setSubmitting] = useState(false);
+    const [confirm, setConfirm] = useState(false);
+
+    useEffect(() => {
+        fetchBlogs();
+    }, []);
+
+    const fetchBlogs = async () => {
+        try {
+            setLoading(true);
+            const response = await getAllBlogsAdmin();
+            console.log("Blogs API response: ", response);
+            if (response && response.success) {
+                // Determine format of returned data (depends on what backend returns for Admin List)
+                const fetchedBlogs = response.data || response.blogs || response.data?.blogs || response.list || (Array.isArray(response.data) ? response.data : []) || [];
+                setBlogs(fetchedBlogs);
+            } else if (response && Array.isArray(response.data)) {
+                // Some APIs don't send a success flag but just send data
+                setBlogs(response.data);
+            } else if (Array.isArray(response)) {
+                // In case it's a direct array
+                setBlogs(response);
+            } else if (response && response.blogs) {
+                setBlogs(response.blogs);
+            } else {
+                toast.error('Failed to fetch blogs');
+            }
+        } catch (error) {
+            toast.error('Error loading blogs');
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleShowModal = (blog = null) => {
+        if (blog && blog._id) {
+            setIsEditing(true);
+            setCurrentBlog(blog);
+            setFormData({
+                title: blog.title || '',
+                desc: blog.desc || '',
+                image: null,
+                isActive: blog.isActive
+            });
+        } else {
+            setIsEditing(false);
+            setCurrentBlog(null);
+            setFormData({
+                title: '',
+                desc: '',
+                image: null,
+                isActive: true
+            });
+        }
+        setShowModal(true);
+    };
+
+    const handleCloseModal = () => {
+        setShowModal(false);
+        setIsEditing(false);
+        setCurrentBlog(null);
+    };
+
+    const handleInputChange = (e) => {
+        const { name, value, type, checked, files } = e.target;
+
+        if (type === 'file') {
+            setFormData({ ...formData, [name]: files[0] });
+        } else if (type === 'checkbox') {
+            setFormData({ ...formData, [name]: checked });
+        } else {
+            setFormData({ ...formData, [name]: value });
+        }
+    };
+
+    const handleDescriptionChange = (content) => {
+        setFormData({ ...formData, desc: content });
+    };
+
+    const handleSubmit = async (e) => {
+        e.preventDefault();
+
+        if (!isEditing && !formData.image) {
+            toast.error('Please upload an image for the blog');
+            return;
+        }
+
+        try {
+            setSubmitting(true);
+
+            const data = new FormData();
+            if (formData.title) data.append('title', formData.title);
+            if (formData.desc) data.append('desc', formData.desc);
+            if (formData.image) data.append('image', formData.image);
+            if (isEditing) data.append('isActive', formData.isActive);
+
+            let response;
+            if (isEditing && currentBlog?._id) {
+                response = await updateBlog(currentBlog._id, data);
+            } else {
+                response = await addBlog(data);
+            }
+
+            if (response && response.success) {
+                toast.success(`Blog successfully ${isEditing ? 'updated' : 'added'}`);
+                fetchBlogs();
+                handleCloseModal();
+            } else {
+                toast.error(response?.message || 'Operation failed');
+            }
+        } catch (error) {
+            toast.error('Error saving blog');
+            console.error(error);
+        } finally {
+            setSubmitting(false);
+        }
+    };
+
+    const handleDelete = async (id) => {
+        setCurrentBlog({ _id: id, actionType: 'Delete' });
+        setConfirm(true);
+    };
+
+    const handleToggleStatus = async (id) => {
+        setCurrentBlog({ _id: id, actionType: 'ToggleStatus' });
+        setConfirm(true);
+    };
+
+    const onConfirm = () => {
+        if (currentBlog?.actionType === 'Delete') {
+            performDelete(currentBlog._id);
+        } else if (currentBlog?.actionType === 'ToggleStatus') {
+            performToggle(currentBlog._id);
+        }
+    };
+
+    const performDelete = async (id) => {
+        try {
+            const response = await deleteBlog(id);
+            if (response && response.success) {
+                toast.success('Blog deleted successfully');
+                setConfirm(false);
+                fetchBlogs();
+            } else {
+                toast.error(response?.message || 'Failed to delete blog');
+            }
+        } catch (error) {
+            toast.error('Error deleting blog');
+            console.error(error);
+        }
+    };
+
+    const performToggle = async (id) => {
+        try {
+            const response = await toggleBlogStatus(id);
+            if (response && response.success) {
+                toast.success('Blog status toggled successfully');
+                setConfirm(false);
+                fetchBlogs();
+            } else {
+                toast.error(response?.message || 'Failed to toggle status');
+            }
+        } catch (error) {
+            toast.error('Error toggling status');
+            console.error(error);
+        }
+    };
+
+    if (isEditing || showModal) {
+        return (
+            <React.Fragment>
+                <Header />
+                <div className="main main-app p-3 p-lg-4">
+                    <Container fluid className="py-4">
+                        <ToastContainer />
+                        <Row className="mb-4 align-items-center">
+                            <Col>
+                                <h2 className="mb-0">{isEditing ? 'Edit Blog' : 'Add New Blog'}</h2>
+                            </Col>
+                            <Col xs="auto">
+                                <Button variant="secondary" onClick={handleCloseModal}>
+                                    <i className="bi bi-arrow-left me-2"></i> Back to Blogs
+                                </Button>
+                            </Col>
+                        </Row>
+
+                        <Card className="shadow-sm">
+                            <Card.Body>
+                                <Form onSubmit={handleSubmit}>
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Title</Form.Label>
+                                        <Form.Control
+                                            type="text"
+                                            placeholder="Enter blog title"
+                                            name="title"
+                                            value={formData.title}
+                                            onChange={handleInputChange}
+                                        />
+                                    </Form.Group>
+
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Description</Form.Label>
+                                        <div style={{ height: '300px', marginBottom: '50px' }}>
+                                            <ReactQuill
+                                                theme="snow"
+                                                value={formData.desc}
+                                                onChange={handleDescriptionChange}
+                                                style={{ height: '100%' }}
+                                                modules={{
+                                                    toolbar: [
+                                                        [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+                                                        ['bold', 'italic', 'underline', 'strike'],
+                                                        [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+                                                        [{ 'align': [] }],
+                                                        ['link', 'image'],
+                                                        ['clean']
+                                                    ],
+                                                }}
+                                            />
+                                        </div>
+                                    </Form.Group>
+
+                                    <Form.Group className="mb-3">
+                                        <Form.Label>Cover Image {isEditing ? '(Leave empty to keep current)' : '*'}</Form.Label>
+                                        {isEditing && currentBlog?.image && (
+                                            <div className="mb-2">
+                                                <img src={currentBlog.image} alt="Current cover" className="img-thumbnail" style={{ height: '150px' }} />
+                                            </div>
+                                        )}
+                                        <Form.Control
+                                            type="file"
+                                            accept="image/*"
+                                            name="image"
+                                            onChange={handleInputChange}
+                                            required={!isEditing}
+                                        />
+                                    </Form.Group>
+
+                                    {isEditing && (
+                                        <Form.Group className="mb-3">
+                                            <Form.Check
+                                                type="switch"
+                                                id="status-switch"
+                                                label={formData.isActive ? "Active (Visible to public)" : "Inactive (Hidden)"}
+                                                name="isActive"
+                                                checked={formData.isActive}
+                                                onChange={handleInputChange}
+                                            />
+                                        </Form.Group>
+                                    )}
+
+                                    <div className="mt-4 text-end">
+                                        <Button variant="secondary" className="me-2" onClick={handleCloseModal} disabled={submitting}>
+                                            Cancel
+                                        </Button>
+                                        <Button variant="primary" style={{ backgroundColor: '#f23636', borderColor: '#f23636' }} type="submit" disabled={submitting}>
+                                            {submitting ? (
+                                                <><Spinner as="span" animation="border" size="sm" role="status" aria-hidden="true" className="me-2" /> Saving...</>
+                                            ) : (
+                                                isEditing ? 'Update Blog' : 'Save Blog'
+                                            )}
+                                        </Button>
+                                    </div>
+                                </Form>
+                            </Card.Body>
+                        </Card>
+                    </Container>
+                </div>
+                <Footer />
+            </React.Fragment>
+        );
+    }
+
+    return (
+        <React.Fragment>
+            <Header />
+            <ConfirmModal
+                show={confirm}
+                onConfirm={onConfirm}
+                onCloseClick={() => setConfirm(false)}
+                data={currentBlog}
+            />
+            <div className="main main-app p-3 p-lg-4">
+                <Container fluid className="py-4">
+                    <ToastContainer />
+                    <Row className="mb-4 align-items-center">
+                        <Col>
+                            <h2 className="mb-0">Blog Management</h2>
+                        </Col>
+                        <Col xs="auto">
+                            <Button variant="primary" style={{ backgroundColor: '#f23636', borderColor: '#f23636' }} onClick={() => handleShowModal()}>
+                                <i className="bi bi-plus-circle me-2"></i> Add New Blog
+                            </Button>
+                        </Col>
+                    </Row>
+
+                    <Card className="shadow-sm">
+                        <Card.Body>
+                            {loading ? (
+                                <div className="text-center py-5">
+                                    <Spinner animation="border" variant="primary" />
+                                    <p className="mt-2 text-muted">Loading blogs...</p>
+                                </div>
+                            ) : (
+                                <div className="table-responsive">
+                                    <Table hover className="align-middle">
+                                        <thead className="table-light">
+                                            <tr>
+                                                <th style={{ width: '15%' }}>Image</th>
+                                                <th style={{ width: '25%' }}>Title</th>
+                                                <th style={{ width: '35%' }}>Description</th>
+                                                <th style={{ width: '10%' }}>Status</th>
+                                                <th style={{ width: '15%', textAlign: 'center' }}>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {blogs.length > 0 ? (
+                                                blogs.map((blog) => (
+                                                    <tr key={blog._id}>
+                                                        <td>
+                                                            {blog.image ? (
+                                                                <img
+                                                                    src={blog.image}
+                                                                    alt={blog.title}
+                                                                    className="img-thumbnail"
+                                                                    style={{ width: '60px', height: '60px', objectFit: 'cover' }}
+                                                                />
+                                                            ) : (
+                                                                <div className="bg-light d-flex align-items-center justify-content-center text-muted rounded" style={{ width: '60px', height: '60px' }}>
+                                                                    <i className="bi bi-image"></i>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td>
+                                                            <div className="fw-bold text-truncate" style={{ maxWidth: '200px' }}>
+                                                                {blog.title || 'Untitled'}
+                                                            </div>
+                                                        </td>
+                                                        <td>
+                                                            <div
+                                                                className="text-truncate text-muted"
+                                                                style={{ maxWidth: '300px' }}
+                                                                dangerouslySetInnerHTML={{ __html: blog.desc || 'No description' }}
+                                                            />
+                                                        </td>
+                                                        <td>
+                                                            <Button
+                                                                size="sm"
+                                                                style={{
+                                                                    backgroundColor: blog.isActive ? '#00b050' : '#dc3545',
+                                                                    borderColor: blog.isActive ? '#00b050' : '#dc3545',
+                                                                    padding: '4px 12px',
+                                                                    fontSize: '13px',
+                                                                    minWidth: '65px'
+                                                                }}
+                                                                title={blog.isActive ? 'Active' : 'Inactive'}
+                                                                onClick={() => handleToggleStatus(blog._id)}
+                                                            >
+                                                                {blog.isActive ? 'Active' : 'Inactive'}
+                                                            </Button>
+                                                        </td>
+                                                        <td style={{ textAlign: 'center' }}>
+                                                            <Button
+                                                                variant="dark"
+                                                                size="sm"
+                                                                className="me-2 p-1"
+                                                                style={{ width: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px' }}
+                                                                onClick={() => handleShowModal(blog)}
+                                                            >
+                                                                <i className="ri-pencil-line fs-5"></i>
+                                                            </Button>
+                                                            <Button
+                                                                variant="danger"
+                                                                size="sm"
+                                                                className="p-1"
+                                                                style={{ width: '32px', height: '32px', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', borderRadius: '4px', backgroundColor: '#dc3545' }}
+                                                                onClick={() => handleDelete(blog._id)}
+                                                            >
+                                                                <i className="ri-delete-bin-6-line fs-5"></i>
+                                                            </Button>
+                                                        </td>
+                                                    </tr>
+                                                ))
+                                            ) : (
+                                                <tr>
+                                                    <td colSpan="5" className="text-center py-4 text-muted">
+                                                        No blogs found. Create your first blog!
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </Table>
+                                </div>
+                            )}
+                        </Card.Body>
+                    </Card>
+                </Container>
+            </div>
+            <Footer />
+        </React.Fragment>
+    );
+};
+
+export default BlogEditor;
