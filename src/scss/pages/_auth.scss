@@ -10,8 +10,14 @@
 
   &.d-block {
     @include gradient-x($primary, darken($primary, 15%), 40%);
+    min-height: 100vh;
+    max-height: 100vh;
+    overflow: hidden;
 
-    .row { min-height: inherit; }
+    .row {
+      min-height: inherit;
+      max-height: 100vh;
+    }
 
     .col-wrapper {
       min-height: inherit;
@@ -19,6 +25,16 @@
       align-items: center;
       justify-content: center;
       background-color: #fff;
+    }
+
+    .auth-img-col {
+      overflow: hidden;
+      height: 100vh;
+      max-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0;
     }
 
     .card-sign {
@@ -168,9 +184,9 @@
 .auth-img {
   width: 100%;
   height: 100%;
-  object-fit: cover;
-  // mix-blend-mode: luminosity;
-  // opacity: .3;
+  max-height: 100vh;
+  object-fit: contain;
+  object-position: center;
 }
 
 .card-auth {

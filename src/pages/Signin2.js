@@ -95,8 +95,8 @@ export default function Signin2() {
             </Card.Body>
           </Card>
         </Col>
-        <Col className="d-none d-lg-block">
-          <img src={require("../assets/images/onwards.jpg")} className="auth-img" alt="" />
+        <Col className="d-none d-lg-block auth-img-col">
+          <img src={require("../assets/images/careveli-vitamin-c-serum.png")} className="auth-img" alt="Careveli 15% Vitamin C Face Serum" />
         </Col>
       </Row>
     </div>
