@@ -1,0 +1,221 @@
+/* Admin Dashboard Styles */
+
+.admin-dashboard {
+    padding: 1rem;
+}
+
+.card-stats {
+    border: none;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.card-stats:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.stats-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 60px;
+    height: 60px;
+    border-radius: 12px;
+    background: rgba(0, 0, 0, 0.03);
+}
+
+.stats-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.icon-wrapper {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 10px;
+}
+
+/* Table Styles */
+.table-two thead th {
+    font-weight: 600;
+    text-transform: uppercase;
+    font-size: 0.75rem;
+    letter-spacing: 0.5px;
+    color: #6B7280;
+    border-bottom: 2px solid #E5E7EB;
+}
+
+.table-two tbody td {
+    vertical-align: middle;
+    padding: 0.875rem 0.75rem;
+}
+
+.table-hover tbody tr {
+    transition: background-color 0.2s;
+}
+
+.table-hover tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Card Styles */
+.card-one {
+    border: none;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.card-one .card-header {
+    background: transparent;
+    border-bottom: 1px solid #E5E7EB;
+    padding: 1rem 1.25rem;
+}
+
+.card-one .card-title {
+    margin: 0;
+    font-weight: 600;
+    font-size: 1rem;
+    color: #1F2937;
+}
+
+.card-one .card-body {
+    padding: 1.25rem;
+}
+
+/* Badge Sizes */
+.badge.size-sm {
+    font-size: 0.7rem;
+    padding: 0.25rem 0.5rem;
+}
+
+/* Progress Bar Custom Styles */
+.progress {
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .stats-icon {
+        width: 48px;
+        height: 48px;
+    }
+
+    .stats-icon i {
+        font-size: 2rem !important;
+    }
+
+    .card-stats h3 {
+        font-size: 1.5rem;
+    }
+
+    .table-responsive {
+        font-size: 0.875rem;
+    }
+}
+
+/* Dark Mode Support */
+[data-skin="dark"] .card-stats,
+[data-skin="dark"] .card-one {
+    background-color: #1F2937;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+[data-skin="dark"] .stats-icon {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+[data-skin="dark"] .card-one .card-title {
+    color: #F9FAFB;
+}
+
+[data-skin="dark"] .stats-label {
+    color: #9CA3AF;
+}
+
+[data-skin="dark"] .table-two thead th {
+    color: #9CA3AF;
+    border-bottom-color: #374151;
+}
+
+[data-skin="dark"] .table-hover tbody tr:hover {
+    background-color: rgba(255, 255, 255, 0.05);
+}
+
+[data-skin="dark"] .icon-wrapper {
+    opacity: 0.9;
+}
+
+/* Animation */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.card-stats,
+.card-one {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+/* Loading State */
+.loading-skeleton {
+    background: linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%);
+    background-size: 200% 100%;
+    animation: loading 1.5s infinite;
+    border-radius: 4px;
+}
+
+@keyframes loading {
+    0% {
+        background-position: 200% 0;
+    }
+
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+/* Custom Scrollbar */
+.table-responsive::-webkit-scrollbar {
+    height: 8px;
+}
+
+.table-responsive::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb {
+    background: #888;
+    border-radius: 4px;
+}
+
+.table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #555;
+}
+
+[data-skin="dark"] .table-responsive::-webkit-scrollbar-track {
+    background: #374151;
+}
+
+[data-skin="dark"] .table-responsive::-webkit-scrollbar-thumb {
+    background: #6B7280;
+}
+
+[data-skin="dark"] .table-responsive::-webkit-scrollbar-thumb:hover {
+    background: #9CA3AF;
+}
