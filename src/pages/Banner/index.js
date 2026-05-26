@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import React, { useEffect, useState, useRef } from 'react'
+=======
+import React, { useEffect, useState } from 'react'
+>>>>>>> origin/manish
 import Header from '../../layouts/Header'
 import { Card, CardBody, CardTitle, Row, Col, Modal, ModalBody, Label } from 'reactstrap'
 import { Button } from 'react-bootstrap';
@@ -8,8 +12,11 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
 import ConfirmModal from '../../components/ConfirmModal';
+<<<<<<< HEAD
 import Cropper from "react-cropper";
 import "cropperjs/dist/cropper.css";
+=======
+>>>>>>> origin/manish
 import Footer from '../../layouts/Footer';
 import * as Utils from "../../Utils";
 import Loader from '../../layouts/Loader';
@@ -30,8 +37,11 @@ function BannerManagement() {
     const [confirm, setConfirm] = useState(false);
     const [file, setFile] = useState(null);
     const [image, setImage] = useState(null);
+<<<<<<< HEAD
     const [cropperModal, setCropperModal] = useState(false);
     const cropperRef = useRef();
+=======
+>>>>>>> origin/manish
 
     useEffect(() => {
         console.log("Token check:", token);
@@ -285,6 +295,7 @@ function BannerManagement() {
         }
     }
 
+<<<<<<< HEAD
     const handleImgChange = (file) => {
         setFile(URL.createObjectURL(file));
         setCropperModal(true);
@@ -296,6 +307,18 @@ function BannerManagement() {
         setImage(fileData);
         setCropperModal(false);
         setLoading(false);
+=======
+    const handleImgChange = (e) => {
+        if (e.target.files && e.target.files[0]) {
+            const selectedFile = e.target.files[0];
+            setFile(URL.createObjectURL(selectedFile));
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                setImage(event.target.result);
+            };
+            reader.readAsDataURL(selectedFile);
+        }
+>>>>>>> origin/manish
     }
 
     return (
@@ -357,6 +380,7 @@ function BannerManagement() {
                         }}
                     />
                 </Card>
+<<<<<<< HEAD
                 <Footer />
             </div>
             <Footer />
@@ -382,25 +406,88 @@ function BannerManagement() {
                                     ref={cropperRef}
                                 />
                             </div>
+=======
+            </div>
+            <Footer />
+
+            <Modal isOpen={isAdd} centered={true} size="lg">
+                <ModalBody>
+                    <div className="p-2">
+                        <h4 className="text-black font-size-20 mb-4">{currentData ? 'Update Banner' : 'Add New Banner'}</h4>
+                        <AvForm
+                            className="form-horizontal"
+                            onValidSubmit={handleValidSubmit}
+                        >
+                            <div className="mb-4">
+                                <Label>Banner Image *</Label>
+                                <input
+                                    type="file"
+                                    className="form-control"
+                                    accept="image/*"
+                                    onChange={handleImgChange}
+                                />
+                                {image && (
+                                    <div className="mt-3">
+                                        <img src={image} alt="Preview" style={{ width: '100%', maxHeight: '200px', objectFit: 'contain' }} />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="mb-4">
+                                <AvField
+                                    name="title"
+                                    label="Banner Title (Optional)"
+                                    placeholder="Enter banner title"
+                                    type="text"
+                                    value={currentData?.title || ''}
+                                />
+                            </div>
+
+                            <div className="mb-4">
+                                <AvField
+                                    type="select"
+                                    name="isActive"
+                                    label="Status"
+                                    value={currentData ? (currentData.isActive ? 'true' : 'false') : 'true'}
+                                >
+                                    <option value="true">Active</option>
+                                    <option value="false">Inactive</option>
+                                </AvField>
+                            </div>
+
+>>>>>>> origin/manish
                             <div className="mt-4">
                                 <Row>
                                     <Col md={6}>
                                         <button
+<<<<<<< HEAD
                                             className="btn btn-dark w-100 waves-effect waves-light"
                                             style={{ border: 'none', backgroundColor: Utils.themeColor }}
                                             onClick={() => { setCropperModal(false); setFile(null) }}
                                             type="reset"
+=======
+                                            className="btn btn-secondary w-100"
+                                            onClick={() => { setIsAdd(false); setCurrentData(null); setImage(null); }}
+                                            type="button"
+>>>>>>> origin/manish
                                         >
                                             Cancel
                                         </button>
                                     </Col>
                                     <Col md={6}>
                                         <button
+<<<<<<< HEAD
                                             className="btn btn-dark w-100 waves-effect waves-light"
                                             type="submit"
                                             style={{ border: 'none', backgroundColor: Utils.themeColor }}
                                         >
                                             Submit
+=======
+                                            className="btn btn-danger w-100"
+                                            type="submit"
+                                        >
+                                            {currentData ? 'Update' : 'Add'}
+>>>>>>> origin/manish
                                         </button>
                                     </Col>
                                 </Row>
@@ -409,6 +496,7 @@ function BannerManagement() {
                     </div>
                 </ModalBody>
             </Modal>
+<<<<<<< HEAD
 
             {/* Add/Edit Banner Modal */}
             <Modal isOpen={isAdd} centered size="lg">
@@ -505,8 +593,14 @@ function BannerManagement() {
                     </Card>
                 </ModalBody>
             </Modal>
+=======
+>>>>>>> origin/manish
         </React.Fragment>
     )
 }
 
+<<<<<<< HEAD
 export default BannerManagement;
+=======
+export default BannerManagement
+>>>>>>> origin/manish

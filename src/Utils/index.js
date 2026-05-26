@@ -1,7 +1,12 @@
 export const projectName = "Careveli";
 export const themeColor = "#f23636";
+<<<<<<< HEAD
 export const API_URL = "https://careevali-backend.vercel.app/api/";
 export const BASE_URL = "https://careevali-backend.vercel.app/";
+=======
+// export const API_URL = "https://careevali-backend.vercel.app/api/";
+// export const BASE_URL = "https://careevali-backend.vercel.app/";
+>>>>>>> origin/manish
 
 export const SHIPCLUES_API_URL = process.env.REACT_APP_SHIPCLUES_API_URL || "https://api.shipclues.in";
 export const SHIPCLUES_API_TOKEN =
@@ -16,8 +21,13 @@ export const SHIPCLUES_DEFAULTS = {
     packageWeightGm: "60.00",
     gstRate: "18.00",
 };
+<<<<<<< HEAD
 // export const API_URL = "http://localhost:8088/api/";
 // export const BASE_URL = "http://localhost:8088/";
+=======
+export const API_URL = "http://localhost:8088/api/";
+export const BASE_URL = "http://localhost:8088/";
+>>>>>>> origin/manish
 
 /**
  * Normalize image input to a string path/URL
