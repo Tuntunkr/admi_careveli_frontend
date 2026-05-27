@@ -47,8 +47,26 @@ const ConfirmModal = ({ show, onConfirm, onCloseClick, data }) => {
                   </p>
                 </>
               }
+              {data?.actionType == 'OrderBulkStatusUpdate' &&
+                <>
+                  <h4>Update status for {data.selectedCount} selected order(s)</h4>
+                  <div className="mt-4">
+                    <Form.Group>
+                      <Form.Label>Select New Status:</Form.Label>
+                      <Form.Select
+                        value={data.newStatus}
+                        onChange={(e) => data.setNewStatus(e.target.value)}
+                      >
+                        {data.orderStatuses?.map(status => (
+                          <option key={status} value={status}>{status}</option>
+                        ))}
+                      </Form.Select>
+                    </Form.Group>
+                  </div>
+                </>
+              }
               {data?.actionType == 'Delete' &&
-                <h4>{"You won't be able to revert this!"}</h4>
+                <h4>{data?.message || "You won't be able to revert this!"}</h4>
               }
               {data?.actionType == 'Eng' &&
                 <h4>{`Are you sure, You want to assign ${data?.engName} for this complaint!`}</h4>
@@ -70,6 +88,9 @@ const ConfirmModal = ({ show, onConfirm, onCloseClick, data }) => {
                 }
                 {data?.actionType == 'OrderStatusUpdate' &&
                   'Update Status'
+                }
+                {data?.actionType == 'OrderBulkStatusUpdate' &&
+                  'Update Selected'
                 }
                 {data?.actionType == 'CreateShipment' &&
                   'Create Shipment'

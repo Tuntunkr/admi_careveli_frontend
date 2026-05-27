@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { Button, Form, Pagination, Badge } from "react-bootstrap";
 import { Card as RsCard, CardBody as RsCardBody, CardTitle as RsCardTitle, Row, Col, Modal, ModalBody, Label } from 'reactstrap';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import { AvForm, AvField } from "availity-reactstrap-validation";
 import { getMarketingLinks, createMarketingLink, updateMarketingLink, deleteMarketingLink } from "../../helper/marketing_link_helper";
 import HeaderMobile from "../../layouts/HeaderMobile";
@@ -11,6 +12,9 @@ import Header from "../../layouts/Header";
 import Footer from "../../layouts/Footer";
 import ConfirmModal from "../../components/ConfirmModal";
 import * as Utils from "../../Utils";
+import { toast } from 'react-toastify';
+import AdminAddButton from '../../components/admin/AdminAddButton';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 
 export default function MarketingLinks() {
     const [links, setLinks] = useState([]);
@@ -145,7 +149,24 @@ export default function MarketingLinks() {
             sortable: true,
             minWidth: '250px',
             wrap: true,
-            cell: row => <a href={row.referralLink} target="_blank" rel="noreferrer" style={{ wordBreak: 'break-all' }}>{row.referralLink}</a>
+            cell: row => (
+                <div className="d-flex align-items-center gap-1">
+                    <a href={row.referralLink} target="_blank" rel="noreferrer" className="text-truncate" style={{ maxWidth: '200px' }} title={row.referralLink}>
+                        {row.referralLink}
+                    </a>
+                    <button
+                        type="button"
+                        className="btn btn-sm btn-outline-secondary py-0 px-1"
+                        title="Copy link"
+                        onClick={() => {
+                            navigator.clipboard.writeText(row.referralLink);
+                            toast.success('Link copied');
+                        }}
+                    >
+                        <i className="ri-file-copy-line" />
+                    </button>
+                </div>
+            )
         },
         {
             name: 'Base URL',
@@ -236,25 +257,10 @@ export default function MarketingLinks() {
             <HeaderMobile />
             <div className="main main-app p-3 p-lg-4">
                 <RsCard>
-                    <Row className='mb-4'>
-                        <Col md={11}>
-                            <RsCardBody>
-                                <RsCardTitle><b>Marketing Links</b></RsCardTitle>
-                            </RsCardBody>
-                        </Col>
-                        <Col md={1}>
-                            <div className='action-btn' style={{ paddingTop: '15px' }}>
-                                <button
-                                    type="button"
-                                    style={{ border: 'none', backgroundColor: Utils.themeColor }}
-                                    className="btn btn-dark"
-                                    onClick={() => handleShowModal()}
-                                >
-                                    <i className={'ri-add-fill'} />
-                                </button>
-                            </div>
-                        </Col>
-                    </Row>
+                    <div className="d-flex flex-wrap align-items-center justify-content-between gap-2 p-3 pb-0">
+                        <RsCardTitle className="mb-0"><b>Marketing Links</b></RsCardTitle>
+                        <AdminAddButton label="Add Link" onClick={() => handleShowModal()} />
+                    </div>
 
                     <div className="px-4 pb-3 mb-3 d-flex border-bottom justify-content-between">
                         <Form onSubmit={handleSearch} className="d-flex w-50">
@@ -278,6 +284,7 @@ export default function MarketingLinks() {
                         </Form>
                     </div>
 
+                    <div className="admin-datatable-scroll">
                     <DataTable
                         columns={columns}
                         data={links}
@@ -286,18 +293,14 @@ export default function MarketingLinks() {
                         paginationTotalRows={totalPages * 10}
                         onChangePage={page => setPage(page)}
                         paginationPerPage={10}
+                        paginationComponentOptions={dataTablePaginationOptions}
                         progressPending={loading}
-                        progressComponent={<div className="text-center py-4">Loading...</div>}
-                        customStyles={{
-                            headCells: {
-                                style: {
-                                    color: 'black',
-                                    fontWeight: 'bold',
-                                    fontSize: 15
-                                },
-                            }
-                        }}
+                        progressComponent={<DataTableSkeleton />}
+                        customStyles={dataTableCustomStyles}
+                        striped
+                        highlightOnHover
                     />
+                    </div>
                 </RsCard>
 
                 {/* Add / Edit Modal - Updated Design matches Banners */}

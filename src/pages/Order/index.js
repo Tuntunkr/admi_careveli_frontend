@@ -1,18 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import Header from '../../layouts/Header';
-import { Card, CardBody, CardTitle, Row, Col, Input, Label } from 'reactstrap';
+import { Card, CardBody, CardTitle, Row, Col, Input, Label, Modal, ModalHeader, ModalBody } from 'reactstrap';
 import { Button, Badge, Form } from 'react-bootstrap';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
 import ConfirmModal from '../../components/ConfirmModal';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
+import OrderItemsCell, {
+    getOrderItemName,
+    getOrderItemImage,
+    PRODUCT_IMAGE_PLACEHOLDER
+} from '../../components/OrderItemsCell';
 import Footer from '../../layouts/Footer';
-import Loader from '../../layouts/Loader';
+import OrderActionsMenu from '../../components/admin/OrderActionsMenu';
+import { dataTableWideStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 import moment from 'moment';
 import {
     getAllOrders,
     updateOrderStatus,
+    deleteOrder,
+    updateBulkOrderStatus,
+    deleteOrders,
     formatCurrency,
+    computeOrderStatistics,
     getStatusBadgeColor,
     getPaymentStatusBadgeColor,
     getOrderStatuses,
@@ -24,12 +35,133 @@ import {
     getShipcluesErrorMessage
 } from '../../helper/shipclues_helper';
 
-// Custom styles for expandable rows
-const expandableRowStyles = {
-    backgroundColor: '#f8f9fa',
-    borderTop: '2px solid #007bff',
-    borderBottom: '2px solid #007bff'
-};
+function OrderDetailsContent({ data }) {
+    const orderItems = data?.items || [];
+    const shippingAddress = data?.shippingAddress || data?.address || {};
+
+    return (
+        <div>
+            <Row className="g-3 mb-3">
+                <Col sm={6}>
+                    <span className="text-muted small">Order #</span>
+                    <div className="fw-semibold">{data?.orderNumber}</div>
+                </Col>
+                <Col sm={6}>
+                    <span className="text-muted small">Date</span>
+                    <div className="fw-semibold">
+                        {data?.createdAt ? moment(data.createdAt).format('DD MMM YYYY, hh:mm A') : '—'}
+                    </div>
+                </Col>
+                <Col sm={6}>
+                    <span className="text-muted small">Status</span>
+                    <div>
+                        <Badge bg={getStatusBadgeColor(data?.status)}>{data?.status}</Badge>
+                    </div>
+                </Col>
+                <Col sm={6}>
+                    <span className="text-muted small">Payment</span>
+                    <div className="d-flex gap-1 flex-wrap">
+                        <Badge bg="secondary">{data?.paymentMethod}</Badge>
+                        <Badge bg={getPaymentStatusBadgeColor(data?.paymentStatus)}>{data?.paymentStatus}</Badge>
+                    </div>
+                </Col>
+            </Row>
+            <Row>
+                <Col md={6}>
+                    <h6 className="mb-3 fw-bold">
+                        <i className="ri-shopping-bag-line me-1" />
+                        Order Items ({orderItems.length})
+                    </h6>
+                    {orderItems.length > 0 ? (
+                        <div className="order-items-cell" style={{ maxHeight: '360px', overflowY: 'auto' }}>
+                            {orderItems.map((item, index) => (
+                                <div className="order-item-row" key={index}>
+                                    <span className="order-item-seq">{String(index + 1).padStart(2, '0')}</span>
+                                    <img
+                                        src={getOrderItemImage(item) || PRODUCT_IMAGE_PLACEHOLDER}
+                                        alt={getOrderItemName(item)}
+                                        className="order-item-thumb"
+                                        onError={(e) => {
+                                            e.target.onerror = null;
+                                            e.target.src = PRODUCT_IMAGE_PLACEHOLDER;
+                                        }}
+                                    />
+                                    <div className="order-item-body">
+                                        <p className="order-item-name">{getOrderItemName(item)}</p>
+                                        <p className="order-item-meta">
+                                            Size: <strong>{item.size || 'N/A'}</strong> · Qty: <strong>{item.quantity}</strong>
+                                        </p>
+                                        <p className="order-item-meta mb-0 text-primary">
+                                            <strong>{formatCurrency(item.price * item.quantity)}</strong>
+                                            <span className="text-muted"> ({formatCurrency(item.price)} each)</span>
+                                        </p>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : (
+                        <p className="text-muted">No items in this order</p>
+                    )}
+                </Col>
+                <Col md={6}>
+                    <h6 className="mb-3 fw-bold">
+                        <i className="ri-map-pin-line me-1" />
+                        Shipping Address
+                    </h6>
+                    <Card className="mb-3 border">
+                        <CardBody className="p-3">
+                            <p className="mb-1">
+                                <strong>{shippingAddress.firstName} {shippingAddress.lastName}</strong>
+                            </p>
+                            <p className="mb-1 text-muted small">{shippingAddress.street}</p>
+                            <p className="mb-1 text-muted small">
+                                {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.zipcode}
+                            </p>
+                            <p className="mb-1 text-muted small">{shippingAddress.country}</p>
+                            <p className="mb-1 text-muted small">
+                                <i className="ri-mail-line me-1" />
+                                {shippingAddress.email}
+                            </p>
+                            <p className="mb-0 text-muted small">
+                                <i className="ri-phone-line me-1" />
+                                {shippingAddress.phone}
+                            </p>
+                        </CardBody>
+                    </Card>
+                    <h6 className="mb-3 fw-bold">
+                        <i className="ri-bill-line me-1" />
+                        Order Summary
+                    </h6>
+                    <Card className="border">
+                        <CardBody className="p-3">
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Subtotal:</span>
+                                <span><strong>{formatCurrency(data.subtotal || 0)}</strong></span>
+                            </div>
+                            <div className="d-flex justify-content-between mb-2">
+                                <span className="text-muted">Shipping Fee:</span>
+                                <span><strong>{formatCurrency(data.shippingFee || 0)}</strong></span>
+                            </div>
+                            <hr className="my-2" />
+                            <div className="d-flex justify-content-between">
+                                <span className="fw-bold">Total:</span>
+                                <span className="fw-bold text-primary">
+                                    {formatCurrency(data.total || data.amount || 0)}
+                                </span>
+                            </div>
+                            {data.razorpayOrderId && (
+                                <div className="mt-2 p-2 bg-light rounded">
+                                    <small className="text-muted d-block">Razorpay Order ID:</small>
+                                    <small style={{ wordBreak: 'break-all' }}>{data.razorpayOrderId}</small>
+                                </div>
+                            )}
+                        </CardBody>
+                    </Card>
+                </Col>
+            </Row>
+        </div>
+    );
+}
 
 function Order() {
     const user = useSelector(state => state.user);
@@ -37,8 +169,13 @@ function Order() {
     const [data, setData] = useState([]);
     const [columns, setColumns] = useState([]);
     const [statusUpdate, setStatusUpdate] = useState({ show: false, orderId: null, currentStatus: '', newStatus: '' });
+    const [bulkStatusUpdate, setBulkStatusUpdate] = useState({ show: false, newStatus: 'Pending' });
+    const [deleteModal, setDeleteModal] = useState({ show: false, orderIds: [], label: '' });
+    const [selectedRows, setSelectedRows] = useState([]);
+    const [toggleCleared, setToggleCleared] = useState(false);
     const [creatingShipmentId, setCreatingShipmentId] = useState(null);
     const [createdShipments, setCreatedShipments] = useState({});
+    const [viewOrder, setViewOrder] = useState(null);
     const [isInitialMount, setIsInitialMount] = useState(true);
 
     // Pagination and Filters
@@ -70,133 +207,6 @@ function Order() {
     const orderStatuses = getOrderStatuses();
     const paymentMethods = getPaymentMethods();
     const paymentStatuses = getPaymentStatuses();
-
-    // Expandable Row Component - Order Details
-    const ExpandedComponent = ({ data }) => {
-        const orderItems = data?.items || [];
-        const shippingAddress = data?.shippingAddress || data?.address || {};
-
-        return (
-            <div style={{ padding: '20px', backgroundColor: '#f8f9fa' }}>
-                <Row>
-                    {/* Order Items */}
-                    <Col md={6}>
-                        <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>
-                            📦 Order Items ({orderItems.length})
-                        </h6>
-                        {orderItems.length > 0 ? (
-                            <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                                {orderItems.map((item, index) => (
-                                    <Card key={index} className="mb-2" style={{ border: '1px solid #dee2e6' }}>
-                                        <CardBody className="p-3">
-                                            <Row>
-                                                <Col xs={3}>
-                                                    {item.image && (
-                                                        <img
-                                                            src={item.image}
-                                                            alt={item.name}
-                                                            style={{
-                                                                width: '100%',
-                                                                height: '80px',
-                                                                objectFit: 'cover',
-                                                                borderRadius: '5px'
-                                                            }}
-                                                            onError={(e) => {
-                                                                e.target.onerror = null;
-                                                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="80" height="80"%3E%3Crect width="80" height="80" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="10" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                                            }}
-                                                        />
-                                                    )}
-                                                </Col>
-                                                <Col xs={9}>
-                                                    <h6 className="mb-1">{item.name}</h6>
-                                                    <p className="mb-1 text-muted small">
-                                                        Size: <strong>{item.size || 'N/A'}</strong>
-                                                    </p>
-                                                    <p className="mb-1 text-muted small">
-                                                        Quantity: <strong>{item.quantity}</strong>
-                                                    </p>
-                                                    <p className="mb-0 text-primary">
-                                                        <strong>{formatCurrency(item.price * item.quantity)}</strong>
-                                                        <span className="text-muted small"> ({formatCurrency(item.price)} each)</span>
-                                                    </p>
-                                                </Col>
-                                            </Row>
-                                        </CardBody>
-                                    </Card>
-                                ))}
-                            </div>
-                        ) : (
-                            <p className="text-muted">No items in this order</p>
-                        )}
-                    </Col>
-
-                    {/* Shipping Address & Order Summary */}
-                    <Col md={6}>
-                        {/* Shipping Address */}
-                        <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>📍 Shipping Address</h6>
-                        <Card className="mb-3" style={{ border: '1px solid #dee2e6' }}>
-                            <CardBody className="p-3">
-                                <p className="mb-1">
-                                    <strong>{shippingAddress.firstName} {shippingAddress.lastName}</strong>
-                                </p>
-                                <p className="mb-1 text-muted small">{shippingAddress.street}</p>
-                                <p className="mb-1 text-muted small">
-                                    {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.zipcode}
-                                </p>
-                                <p className="mb-1 text-muted small">{shippingAddress.country}</p>
-                                <p className="mb-1 text-muted small">
-                                    📧 {shippingAddress.email}
-                                </p>
-                                <p className="mb-0 text-muted small">
-                                    📱 {shippingAddress.phone}
-                                </p>
-                            </CardBody>
-                        </Card>
-
-                        {/* Order Summary */}
-                        <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>💰 Order Summary</h6>
-                        <Card style={{ border: '1px solid #dee2e6' }}>
-                            <CardBody className="p-3">
-                                <div className="d-flex justify-content-between mb-2">
-                                    <span className="text-muted">Subtotal:</span>
-                                    <span><strong>{formatCurrency(data.subtotal || 0)}</strong></span>
-                                </div>
-                                <div className="d-flex justify-content-between mb-2">
-                                    <span className="text-muted">Shipping Fee:</span>
-                                    <span><strong>{formatCurrency(data.shippingFee || 0)}</strong></span>
-                                </div>
-                                <hr className="my-2" />
-                                <div className="d-flex justify-content-between">
-                                    <span style={{ fontSize: '16px', fontWeight: 'bold' }}>Total:</span>
-                                    <span style={{ fontSize: '18px', fontWeight: 'bold', color: '#007bff' }}>
-                                        {formatCurrency(data.total || data.amount || 0)}
-                                    </span>
-                                </div>
-                                <hr className="my-2" />
-                                <div className="d-flex justify-content-between mb-1">
-                                    <span className="text-muted small">Payment Method:</span>
-                                    <Badge bg="secondary">{data.paymentMethod}</Badge>
-                                </div>
-                                <div className="d-flex justify-content-between">
-                                    <span className="text-muted small">Payment Status:</span>
-                                    <Badge bg={getPaymentStatusBadgeColor(data.paymentStatus)}>
-                                        {data.paymentStatus}
-                                    </Badge>
-                                </div>
-                                {data.razorpayOrderId && (
-                                    <div className="mt-2 p-2" style={{ backgroundColor: '#f0f0f0', borderRadius: '5px' }}>
-                                        <small className="text-muted d-block">Razorpay Order ID:</small>
-                                        <small style={{ wordBreak: 'break-all' }}>{data.razorpayOrderId}</small>
-                                    </div>
-                                )}
-                            </CardBody>
-                        </Card>
-                    </Col>
-                </Row>
-            </div>
-        );
-    };
 
     useEffect(() => {
         loadColumns();
@@ -233,12 +243,19 @@ function Order() {
     const loadColumns = () => {
         setColumns([
             {
+                name: 'Products',
+                selector: row => row.items?.map(item => getOrderItemName(item)).join(', '),
+                sortable: false,
+                width: '320px',
+                cell: row => <OrderItemsCell items={row.items} maxVisible={3} />
+            },
+            {
                 name: 'Order #',
                 selector: row => row.orderNumber,
                 sortable: true,
                 width: '160px',
                 cell: row => (
-                    <div>
+                    <div className="order-number-cell">
                         <div style={{ fontWeight: 'bold', fontSize: '12px' }}>
                             {row.orderNumber}
                         </div>
@@ -260,18 +277,6 @@ function Order() {
                         </div>
                         <small className="text-muted">{row.shippingAddress?.email}</small>
                     </div>
-                )
-            },
-            {
-                name: 'Items',
-                selector: row => row.items?.length || 0,
-                sortable: true,
-                width: '80px',
-                center: true,
-                cell: row => (
-                    <Badge bg="info">
-                        {row.items?.length || 0}
-                    </Badge>
                 )
             },
             {
@@ -313,7 +318,11 @@ function Order() {
             },
             {
                 name: 'Actions',
-                width: '240px',
+                width: '110px',
+                minWidth: '110px',
+                ignoreRowClick: true,
+                allowOverflow: true,
+                button: true,
                 cell: row => {
                     const isCreating = creatingShipmentId === row._id;
                     const isAlreadyCreated = Boolean(
@@ -323,42 +332,15 @@ function Order() {
                     );
 
                     return (
-                        <div className="d-flex gap-2 flex-wrap">
-                            <Button
-                                size="sm"
-                                variant="primary"
-                                onClick={() => handleStatusChange(row)}
-                                title="Update Status"
-                            >
-                                <i className="ri-refresh-line"></i> Status
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant={isAlreadyCreated ? 'secondary' : 'success'}
-                                disabled={isCreating || isAlreadyCreated}
-                                onClick={() => handleCreateShipment(row)}
-                                title={
-                                    isAlreadyCreated
-                                        ? 'Shipment already created on Shipclues'
-                                        : 'Create shipment on Shipclues'
-                                }
-                            >
-                                {isCreating ? (
-                                    <>
-                                        <span className="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true" />
-                                        Creating...
-                                    </>
-                                ) : isAlreadyCreated ? (
-                                    <>
-                                        <i className="ri-check-line"></i> Created
-                                    </>
-                                ) : (
-                                    <>
-                                        <i className="ri-truck-line"></i> Ship
-                                    </>
-                                )}
-                            </Button>
-                        </div>
+                        <OrderActionsMenu
+                            row={row}
+                            isCreating={isCreating}
+                            isAlreadyCreated={isAlreadyCreated}
+                            onView={setViewOrder}
+                            onStatus={handleStatusChange}
+                            onShip={handleCreateShipment}
+                            onDelete={(r) => handleDeleteClick([r._id], r.orderNumber)}
+                        />
                     );
                 }
             }
@@ -408,11 +390,15 @@ function Order() {
                     });
                 }
 
-                // Update statistics if available
-                if (response.data?.statistics) {
-                    setStatistics(response.data.statistics);
-                } else if (response.statistics) {
-                    setStatistics(response.statistics);
+                const apiStats = response.data?.statistics || response.statistics;
+                const computedStats = computeOrderStatistics(orders, response.data?.pagination || response.pagination || {
+                    totalOrders: orders.length,
+                });
+
+                if (apiStats && Number(apiStats.totalRevenue) > 0) {
+                    setStatistics(apiStats);
+                } else {
+                    setStatistics(computedStats);
                 }
 
                 // Only show success message if we have orders
@@ -494,12 +480,116 @@ function Order() {
             if (response?.success) {
                 toast.success(response.message || 'Order status updated successfully');
                 setStatusUpdate({ show: false, orderId: null, currentStatus: '', newStatus: '' });
-                getData(); // Refresh the list
+                getData();
             } else {
                 toast.error(response?.message || 'Failed to update order status');
             }
         } catch (error) {
             console.error('Error updating order status:', error);
+            toast.error('Error updating order status');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleRowSelected = React.useCallback(state => {
+        setSelectedRows(state.selectedRows);
+    }, []);
+
+    const clearSelection = () => {
+        setSelectedRows([]);
+        setToggleCleared(prev => !prev);
+    };
+
+    const handleDeleteClick = (orderIds, label) => {
+        const ids = Array.isArray(orderIds) ? orderIds.filter(Boolean) : [orderIds].filter(Boolean);
+        if (!ids.length) return;
+
+        const displayLabel = Array.isArray(label)
+            ? `${label.length} order(s)`
+            : label || `${ids.length} order(s)`;
+
+        setDeleteModal({
+            show: true,
+            orderIds: ids,
+            label: displayLabel
+        });
+    };
+
+    const handleBulkDeleteClick = () => {
+        if (!selectedRows.length) {
+            toast.warning('No orders selected');
+            return;
+        }
+        handleDeleteClick(
+            selectedRows.map(row => row._id),
+            `${selectedRows.length} order(s)`
+        );
+    };
+
+    const handleBulkStatusOpen = () => {
+        if (!selectedRows.length) {
+            toast.warning('No orders selected');
+            return;
+        }
+        setBulkStatusUpdate({ show: true, newStatus: 'Pending' });
+    };
+
+    const handleDeleteConfirm = async () => {
+        if (!deleteModal.orderIds.length) return;
+
+        setLoading(true);
+        try {
+            const { successCount, failCount } = await deleteOrders(deleteModal.orderIds, user?.token);
+
+            if (successCount > 0) {
+                toast.success(`Deleted ${successCount} order(s) successfully`);
+                setDeleteModal({ show: false, orderIds: [], label: '' });
+                clearSelection();
+                getData();
+            }
+            if (failCount > 0) {
+                toast.error(`Failed to delete ${failCount} order(s)`);
+            }
+        } catch (error) {
+            console.error('Error deleting orders:', error);
+            toast.error('Error deleting orders');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleBulkStatusUpdate = async () => {
+        if (!bulkStatusUpdate.newStatus) {
+            toast.error('Please select a status');
+            return;
+        }
+
+        const orderIds = selectedRows.map(row => row._id).filter(Boolean);
+        if (!orderIds.length) {
+            toast.warning('No orders selected');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const { successCount, failCount } = await updateBulkOrderStatus(
+                orderIds,
+                bulkStatusUpdate.newStatus,
+                user?.token
+            );
+
+            if (successCount > 0) {
+                toast.success(`Updated status for ${successCount} order(s)`);
+                setBulkStatusUpdate({ show: false, newStatus: 'Pending' });
+                clearSelection();
+                getData();
+            }
+            if (failCount > 0) {
+                toast.error(`Failed to update ${failCount} order(s)`);
+            }
+        } catch (error) {
+            console.error('Error updating bulk order status:', error);
             toast.error('Error updating order status');
         } finally {
             setLoading(false);
@@ -545,7 +635,7 @@ function Order() {
         <>
             <Header />
             <div className="main main-app p-3 p-lg-4">
-                <div className="d-md-flex align-items-center justify-content-between mb-4">
+                <div className="main-page-header d-md-flex align-items-center justify-content-between">
                     <div>
                         <ol className="breadcrumb fs-sm mb-1">
                             <li className="breadcrumb-item"><a href="#">Dashboard</a></li>
@@ -557,42 +647,55 @@ function Order() {
 
                 {/* Statistics Cards */}
                 <Row className="g-3 mb-4">
-                    <Col md={4}>
-                        <Card className="card-one">
-                            <CardBody>
-                                <Label className="card-label fs-sm fw-medium mb-1">Total Orders</Label>
-                                <h3 className="card-value mb-0">
-                                    {pagination.totalOrders || data.length}
-                                </h3>
-                            </CardBody>
-                        </Card>
-                    </Col>
-                    <Col md={4}>
-                        <Card className="card-one">
-                            <CardBody>
-                                <Label className="card-label fs-sm fw-medium mb-1">Total Revenue</Label>
-                                <h3 className="card-value mb-0">
-                                    {formatCurrency(statistics.totalRevenue)}
-                                </h3>
-                            </CardBody>
-                        </Card>
-                    </Col>
-                    <Col md={4}>
-                        <Card className="card-one">
-                            <CardBody>
-                                <Label className="card-label fs-sm fw-medium mb-1">Average Order Value</Label>
-                                <h3 className="card-value mb-0">
-                                    {formatCurrency(statistics.averageOrderValue)}
-                                </h3>
-                            </CardBody>
-                        </Card>
-                    </Col>
+                    {[
+                        {
+                            label: 'Total Orders',
+                            value: pagination.totalOrders || data.length,
+                            icon: 'ri-shopping-cart-2-line',
+                            bg: '#FFEDD5',
+                            color: '#EA580C',
+                            accent: '#EA580C',
+                        },
+                        {
+                            label: 'Total Revenue',
+                            value: formatCurrency(statistics.totalRevenue),
+                            icon: 'ri-coins-line',
+                            bg: '#DCFCE7',
+                            color: '#16A34A',
+                            accent: '#16A34A',
+                        },
+                        {
+                            label: 'Average Order Value',
+                            value: formatCurrency(statistics.averageOrderValue),
+                            icon: 'ri-line-chart-line',
+                            bg: '#DBEAFE',
+                            color: '#2563EB',
+                            accent: '#2563EB',
+                        },
+                    ].map(stat => (
+                        <Col md={4} key={stat.label}>
+                            <Card className="card-one order-stat-card shadow-sm" style={{ '--order-stat-accent': stat.accent }}>
+                                <CardBody className="d-flex align-items-center justify-content-between gap-2">
+                                    <div>
+                                        <Label className="card-label fs-sm fw-medium mb-1 text-secondary">{stat.label}</Label>
+                                        <h3 className="card-value mb-0">{stat.value}</h3>
+                                    </div>
+                                    <div className="order-stat-card__icon" style={{ backgroundColor: stat.bg, color: stat.color }}>
+                                        <i className={stat.icon} />
+                                    </div>
+                                </CardBody>
+                            </Card>
+                        </Col>
+                    ))}
                 </Row>
 
                 {/* Filters */}
                 <Card className="card-one mb-3">
                     <CardBody>
-                        <h6 className="mb-3">🔍 Filters</h6>
+                        <h6 className="mb-3 fw-semibold">
+                            <i className="ri-filter-3-line me-1" />
+                            Filters
+                        </h6>
                         <Row className="g-3">
                             {/* Search */}
                             <Col md={3}>
@@ -711,15 +814,33 @@ function Order() {
                 </Card>
 
                 {/* Orders Table */}
-                <Card className="card-one">
-                    <CardBody>
-                        <CardTitle tag="h6" className="mb-3">
-                            📦 All Orders ({pagination.totalOrders || data.length})
-                        </CardTitle>
+                <Card className="card-one orders-table-card">
+                    <CardBody className="orders-table-card__body">
+                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+                            <CardTitle tag="h6" className="mb-0">
+                                <i className="ri-list-check me-1" />
+                                All Orders ({pagination.totalOrders || data.length})
+                            </CardTitle>
+                            {selectedRows.length > 0 && (
+                                <div className="d-flex gap-2 flex-wrap">
+                                    <Button variant="primary" size="sm" onClick={handleBulkStatusOpen}>
+                                        <i className="ri-refresh-line me-1"></i>
+                                        Update Status ({selectedRows.length})
+                                    </Button>
+                                    <Button variant="danger" size="sm" onClick={handleBulkDeleteClick}>
+                                        <i className="ri-delete-bin-line me-1"></i>
+                                        Delete ({selectedRows.length})
+                                    </Button>
+                                </div>
+                            )}
+                        </div>
 
-                        {loading ? (
-                            <Loader />
-                        ) : (
+                        <p className="text-muted small mb-2 orders-table-scroll-hint">
+                            <i className="ri-arrow-left-right-line me-1" />
+                            Scroll horizontally to see Payment and Actions
+                        </p>
+
+                        <div className="admin-datatable-scroll orders-datatable-wrap">
                             <DataTable
                                 columns={columns}
                                 data={data}
@@ -730,12 +851,16 @@ function Order() {
                                 paginationPerPage={filters.limit}
                                 onChangePage={handlePageChange}
                                 onChangeRowsPerPage={handlePerRowsChange}
-                                expandableRows
-                                expandableRowsComponent={ExpandedComponent}
-                                expandableRowsComponentProps={{ style: expandableRowStyles }}
+                                progressPending={loading}
+                                progressComponent={<DataTableSkeleton rows={8} columns={7} />}
+                                selectableRows
+                                selectableRowsHighlight
+                                onSelectedRowsChange={handleRowSelected}
+                                clearSelectedRows={toggleCleared}
+                                customStyles={dataTableWideStyles}
+                                paginationComponentOptions={dataTablePaginationOptions}
                                 highlightOnHover
                                 striped
-                                responsive
                                 noDataComponent={
                                     <div className="text-center py-4">
                                         <i className="ri-inbox-line" style={{ fontSize: '48px', color: '#ccc' }}></i>
@@ -743,7 +868,7 @@ function Order() {
                                     </div>
                                 }
                             />
-                        )}
+                        </div>
                     </CardBody>
                 </Card>
 
@@ -762,6 +887,42 @@ function Order() {
                         }}
                     />
                 )}
+
+                {bulkStatusUpdate.show && (
+                    <ConfirmModal
+                        show={bulkStatusUpdate.show}
+                        onCloseClick={() => setBulkStatusUpdate({ show: false, newStatus: 'Pending' })}
+                        onConfirm={handleBulkStatusUpdate}
+                        data={{
+                            actionType: 'OrderBulkStatusUpdate',
+                            newStatus: bulkStatusUpdate.newStatus,
+                            setNewStatus: (val) => setBulkStatusUpdate(prev => ({ ...prev, newStatus: val })),
+                            orderStatuses: orderStatuses,
+                            selectedCount: selectedRows.length
+                        }}
+                    />
+                )}
+
+                {deleteModal.show && (
+                    <ConfirmModal
+                        show={deleteModal.show}
+                        onCloseClick={() => setDeleteModal({ show: false, orderIds: [], label: '' })}
+                        onConfirm={handleDeleteConfirm}
+                        data={{
+                            actionType: 'Delete',
+                            message: `Delete ${deleteModal.label}? This action cannot be undone.`
+                        }}
+                    />
+                )}
+
+                <Modal isOpen={Boolean(viewOrder)} toggle={() => setViewOrder(null)} size="lg" centered>
+                    <ModalHeader toggle={() => setViewOrder(null)}>
+                        Order Details — {viewOrder?.orderNumber}
+                    </ModalHeader>
+                    <ModalBody>
+                        {viewOrder && <OrderDetailsContent data={viewOrder} />}
+                    </ModalBody>
+                </Modal>
 
                 <Footer />
             </div>

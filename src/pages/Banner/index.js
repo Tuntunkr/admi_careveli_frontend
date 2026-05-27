@@ -7,9 +7,14 @@ import { del, get, post, put } from '../../helper/api_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import ConfirmModal from '../../components/ConfirmModal';
 import Footer from '../../layouts/Footer';
+import AdminAddButton from '../../components/admin/AdminAddButton';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
+import { Link } from 'react-router-dom';
 import * as Utils from "../../Utils";
+import { toTitleCase } from '../../Utils/formatText';
 import Loader from '../../layouts/Loader';
 import moment from 'moment';
 
@@ -51,6 +56,7 @@ function BannerManagement() {
             },
             {
                 name: 'Title',
+                cell: row => row?.title ? toTitleCase(row.title) : '-',
                 selector: row => row?.title || '-',
                 sortable: true,
                 wrap: true,
@@ -230,7 +236,7 @@ function BannerManagement() {
 
                 // Add title (optional string field)
                 if (v.title && v.title.trim()) {
-                    formData.append('title', v.title.trim());
+                    formData.append('title', toTitleCase(v.title));
                 }
 
                 // Add isActive status
@@ -302,54 +308,34 @@ function BannerManagement() {
                 onCloseClick={() => setConfirm(false)}
                 data={currentData}
             />
-            {loading && <Loader />}
-
             <div className="main main-app p-3 p-lg-4">
+                <div className="main-page-header d-md-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <ol className="breadcrumb fs-sm mb-1">
+                            <li className="breadcrumb-item"><Link to="/admin/dashboard">Dashboard</Link></li>
+                            <li className="breadcrumb-item active" aria-current="page">Banner Management</li>
+                        </ol>
+                        <h4 className="main-title mb-0 admin-page-title">Banner Management</h4>
+                    </div>
+                    <AdminAddButton label="Add Banner" onClick={() => { setCurrentData(null); setIsAdd(true) }} />
+                </div>
                 <Card>
-                    <Row className='mb-4'>
-                        <Col md={11}>
-                            <CardBody>
-                                <CardTitle><b>Banner Management</b></CardTitle>
-                            </CardBody>
-                        </Col>
-                        <Col md={1}>
-                            <div className='action-btn'>
-                                <button
-                                    type="button"
-                                    style={{ border: 'none', backgroundColor: Utils.themeColor }}
-                                    className="btn btn-dark"
-                                    onClick={() => { setCurrentData(null); setIsAdd(true) }}
-                                >
-                                    <i className={'ri-add-fill'} />
-                                </button>
-                            </div>
-                        </Col>
-                    </Row>
                     <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                         columns={columns}
                         data={data}
                         pagination
                         paginationPerPage={10}
                         paginationRowsPerPageOptions={[10, 20, 30, 50]}
+                        paginationComponentOptions={dataTablePaginationOptions}
                         conditionalRowStyles={[{
                             when: row => row?.style,
                             style: row => ({ width: row?.style?.width }),
                         }]}
-                        customStyles={{
-                            headCells: {
-                                style: {
-                                    color: 'black',
-                                    fontWeight: 'bold',
-                                    fontSize: 15,
-                                    width: 0
-                                },
-                            },
-                            cells: {
-                                style: {
-                                    width: 0
-                                }
-                            }
-                        }}
+                        customStyles={dataTableCustomStyles}
+                        striped
+                        highlightOnHover
                     />
                 </Card>
             </div>

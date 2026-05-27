@@ -5,6 +5,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { get } from '../../helper/api_helper';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import Header from '../../layouts/Header';
 import Footer from '../../layouts/Footer';
 import Loader from '../../layouts/Loader';
@@ -18,6 +19,7 @@ function Newsletter() {
     const [searchText, setSearchText] = useState('');
     const [selectedRows, setSelectedRows] = useState([]);
     const [toggleCleared, setToggleCleared] = useState(false);
+    const [hasLoadedOnce, setHasLoadedOnce] = useState(false);
 
     // DataTable columns configuration
     const columns = [
@@ -103,7 +105,6 @@ function Newsletter() {
             if (res?.success) {
                 setSubscribers(res?.data?.subscribers || []);
                 setFilteredSubscribers(res?.data?.subscribers || []);
-                toast.success(`Loaded ${res?.data?.count || 0} subscribers`);
             } else {
                 toast.error(res?.message || "Failed to fetch subscribers");
                 setSubscribers([]);
@@ -116,6 +117,7 @@ function Newsletter() {
             setFilteredSubscribers([]);
         } finally {
             setLoading(false);
+            setHasLoadedOnce(true);
         }
     };
 
@@ -226,6 +228,8 @@ function Newsletter() {
 
                                 {/* Data Table */}
                                 <DataTable
+                        progressPending={loading && !hasLoadedOnce}
+                        progressComponent={<DataTableSkeleton />}
                                     columns={columns}
                                     data={filteredSubscribers}
                                     pagination
@@ -251,8 +255,6 @@ function Newsletter() {
                 </Row>
 
                 {/* Loading Overlay */}
-                {loading && <Loader />}
-
                 <Footer />
             </div>
         </React.Fragment>

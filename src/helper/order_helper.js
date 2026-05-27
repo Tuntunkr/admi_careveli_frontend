@@ -1,4 +1,4 @@
-import { get, post } from './api_helper';
+import { get, post, del } from './api_helper';
 
 /**
  * Get all orders (Admin only)
@@ -23,6 +23,62 @@ export const getAllOrders = (token, params = {}) => {
 export const updateOrderStatus = (orderId, status, token) => {
     console.log('updateOrderStatus - OrderID:', orderId, 'Status:', status);
     return post('order/status', { orderId, status, token });
+};
+
+/**
+ * Delete order (Admin only)
+ * @param {string} orderId - Order ID to delete
+ * @param {string} token - Admin authentication token
+ * @returns {Promise} API response
+ */
+export const deleteOrder = (orderId, token) => {
+    console.log('deleteOrder - OrderID:', orderId);
+    return del(`order/delete/${orderId}`, { token });
+};
+
+/**
+ * Update status for multiple orders
+ * @param {Array<string>} orderIds - Order IDs
+ * @param {string} status - New status
+ * @param {string} token - Admin token
+ * @returns {Promise<{successCount: number, failCount: number, total: number}>}
+ */
+export const updateBulkOrderStatus = async (orderIds, status, token) => {
+    const results = await Promise.allSettled(
+        orderIds.map(orderId => updateOrderStatus(orderId, status, token))
+    );
+
+    const successCount = results.filter(
+        result => result.status === 'fulfilled' && result.value?.success
+    ).length;
+
+    return {
+        successCount,
+        failCount: orderIds.length - successCount,
+        total: orderIds.length
+    };
+};
+
+/**
+ * Delete multiple orders
+ * @param {Array<string>} orderIds - Order IDs
+ * @param {string} token - Admin token
+ * @returns {Promise<{successCount: number, failCount: number, total: number}>}
+ */
+export const deleteOrders = async (orderIds, token) => {
+    const results = await Promise.allSettled(
+        orderIds.map(orderId => deleteOrder(orderId, token))
+    );
+
+    const successCount = results.filter(
+        result => result.status === 'fulfilled' && result.value?.success
+    ).length;
+
+    return {
+        successCount,
+        failCount: orderIds.length - successCount,
+        total: orderIds.length
+    };
 };
 
 /**
@@ -112,6 +168,24 @@ export const formatCurrency = (amount) => {
         style: 'currency',
         currency: 'INR'
     }).format(amount || 0);
+};
+
+/**
+ * Derive order statistics from order rows when API stats are missing or zero.
+ */
+export const computeOrderStatistics = (orders = [], pagination = {}) => {
+    const totalOrders = pagination?.totalOrders ?? orders.length;
+    const totalRevenue = orders.reduce(
+        (sum, order) => sum + Number(order?.total ?? order?.amount ?? 0),
+        0
+    );
+    const averageOrderValue = orders.length ? totalRevenue / orders.length : 0;
+
+    return {
+        totalOrders,
+        totalRevenue,
+        averageOrderValue,
+    };
 };
 
 /**

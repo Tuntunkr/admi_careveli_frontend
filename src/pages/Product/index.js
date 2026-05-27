@@ -1,11 +1,13 @@
 import React, { useEffect, useState } from 'react'
 import Header from '../../layouts/Header'
-import { Card, CardBody, CardTitle, Row, Col } from 'reactstrap'
+import { Card, CardBody, CardTitle, Row, Col, Modal, ModalHeader, ModalBody } from 'reactstrap'
 import { Button } from 'react-bootstrap';
 import { get, post, upload } from '../../helper/api_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
+import { dataTableProductStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 import ConfirmModal from '../../components/ConfirmModal';
 import Footer from '../../layouts/Footer';
 import * as Utils from "../../Utils";
@@ -13,12 +15,179 @@ import Loader from '../../layouts/Loader';
 import moment from 'moment';
 import AddProduct from './AddProduct';
 
-// Custom styles for expandable rows
-const expandableRowStyles = {
-    backgroundColor: '#f8f9fa',
-    borderTop: '2px solid #007bff',
-    borderBottom: '2px solid #007bff'
-};
+function getCategoryLabel(value) {
+    if (!value) return '—';
+    if (typeof value === 'object') return value.title || value.name || '—';
+    return value;
+}
+
+function normalizeProductImages(product) {
+    const raw = product?.images || product?.image || [];
+    return Array.isArray(raw) ? raw : raw ? [raw] : [];
+}
+
+function ProductDetailsContent({ product }) {
+    if (!product) return null;
+
+    const productImages = normalizeProductImages(product);
+    const categoryName = getCategoryLabel(product.category);
+    const subCategoryName = getCategoryLabel(product.subCategory);
+    const isBestseller = Boolean(product?.bestseller || product?.bestSeller);
+    const isActive = product?.isActive !== false;
+
+    return (
+        <div className="product-details-modal">
+            <div className="d-flex flex-wrap align-items-start gap-3 mb-4 pb-3 border-bottom">
+                {productImages[0] ? (
+                    <img
+                        src={Utils.getImageUrl(productImages[0])}
+                        alt={product.name}
+                        className="product-details-modal__thumb"
+                        onError={(e) => {
+                            e.target.onerror = null;
+                            e.target.style.display = 'none';
+                        }}
+                    />
+                ) : null}
+                <div className="flex-grow-1">
+                    <h5 className="mb-2 fw-bold">{product.name || '—'}</h5>
+                    <div className="d-flex flex-wrap gap-2">
+                        <span className={`badge rounded-pill ${isActive ? 'bg-success' : 'bg-secondary'}`}>
+                            {isActive ? 'Active' : 'Inactive'}
+                        </span>
+                        {isBestseller && <span className="badge rounded-pill bg-warning text-dark">Bestseller</span>}
+                        {product?.soldOut && <span className="badge rounded-pill bg-danger">Sold out</span>}
+                    </div>
+                    <code className="small text-muted d-block mt-2 text-break">{product._id}</code>
+                </div>
+            </div>
+
+            <Row className="g-4">
+                <Col md={6}>
+                    <h6 className="fw-semibold mb-3">
+                        <i className="ri-image-line me-1" />
+                        Product images
+                    </h6>
+                    <Row className="g-2">
+                        {productImages.length > 0 ? (
+                            productImages.map((img, index) => (
+                                <Col xs={6} sm={4} key={index}>
+                                    <div className="product-details-modal__img-wrap">
+                                        <img
+                                            src={Utils.getImageUrl(img)}
+                                            alt={`${product.name} ${index + 1}`}
+                                            onError={(e) => {
+                                                e.target.onerror = null;
+                                                e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
+                                            }}
+                                        />
+                                    </div>
+                                </Col>
+                            ))
+                        ) : (
+                            <Col xs={12}>
+                                <p className="text-muted small mb-0">No images available</p>
+                            </Col>
+                        )}
+                    </Row>
+                </Col>
+
+                <Col md={6}>
+                    <h6 className="fw-semibold mb-3">
+                        <i className="ri-file-list-3-line me-1" />
+                        Product details
+                    </h6>
+
+                    <div className="mb-3">
+                        <small className="text-muted d-block mb-1">Description</small>
+                        <p className="mb-0 small">{product?.description || '—'}</p>
+                    </div>
+
+                    <Row className="g-2 mb-3">
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Category</small>
+                            <span className="fw-medium">{categoryName}</span>
+                        </Col>
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Sub category</small>
+                            <span className="fw-medium">{subCategoryName}</span>
+                        </Col>
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Price</small>
+                            <span className="fw-medium text-success">
+                                ₹{product?.discountPrice ?? product?.price ?? '—'}
+                            </span>
+                            {product?.discountPrice && (
+                                <span className="text-muted text-decoration-line-through ms-2 small">
+                                    ₹{product.price}
+                                </span>
+                            )}
+                        </Col>
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Stock</small>
+                            <span className="fw-medium">{product?.stock ?? 0} units</span>
+                        </Col>
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Sizes</small>
+                            <span className="fw-medium">{product?.sizes?.join(', ') || '—'}</span>
+                        </Col>
+                        <Col xs={6}>
+                            <small className="text-muted d-block">Rating</small>
+                            <span className="fw-medium">
+                                <i className="ri-star-fill text-warning me-1" />
+                                {product?.rating || 0} ({product?.reviewCount || 0} reviews)
+                            </span>
+                        </Col>
+                    </Row>
+
+                    {product?.ingredients?.length > 0 && (
+                        <div className="mb-3">
+                            <small className="text-muted d-block mb-1">Ingredients</small>
+                            <ul className="small mb-0 ps-3">
+                                {product.ingredients.map((ing, idx) => (
+                                    <li key={idx}>{ing}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {product?.benefits?.length > 0 && (
+                        <div className="mb-3">
+                            <small className="text-muted d-block mb-1">Benefits</small>
+                            <ul className="small mb-0 ps-3">
+                                {product.benefits.map((ben, idx) => (
+                                    <li key={idx}>{ben}</li>
+                                ))}
+                            </ul>
+                        </div>
+                    )}
+
+                    {product?.howToUse && (
+                        <div className="mb-3">
+                            <small className="text-muted d-block mb-1">How to use</small>
+                            <p className="small mb-0">{product.howToUse}</p>
+                        </div>
+                    )}
+
+                    <div className="text-muted small">
+                        <div>
+                            <strong>Created:</strong>{' '}
+                            {product?.createdAt
+                                ? moment(product.createdAt).format('DD MMM YYYY, hh:mm A')
+                                : '—'}
+                        </div>
+                        <div>
+                            <strong>Updated:</strong>{' '}
+                            {product?.updatedAt
+                                ? moment(product.updatedAt).format('DD MMM YYYY, hh:mm A')
+                                : '—'}
+                        </div>
+                    </div>
+                </Col>
+            </Row>
+        </div>
+    );
+}
 
 function Product() {
     const user = useSelector(state => state.user);
@@ -48,141 +217,7 @@ function Product() {
     });
 
     const [categories, setCategories] = useState([]);
-
-    // Expandable Row Component
-    const ExpandedComponent = ({ data }) => {
-        const productImages = data?.images || data?.image || [];
-
-        const categoryName = data?.category && typeof data.category === 'object'
-            ? data.category.title || data.category.name
-            : data?.category || 'N/A';
-        const subCategoryName = data?.subCategory && typeof data.subCategory === 'object'
-            ? data.subCategory.title || data.subCategory.name
-            : data?.subCategory || 'N/A';
-
-        return (
-            <div style={{ padding: '20px', backgroundColor: '#f8f9fa' }}>
-                <Row>
-                    {/* All Images */}
-                    <Col md={6}>
-                        <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>📸 Product Images</h6>
-                        <Row>
-                            {productImages.length > 0 ? (
-                                productImages.map((img, index) => (
-                                    <Col xs={6} md={4} key={index} className="mb-3">
-                                        <div style={{
-                                            border: '2px solid #dee2e6',
-                                            borderRadius: '8px',
-                                            overflow: 'hidden',
-                                            height: '150px'
-                                        }}>
-                                            <img
-                                                src={Utils.getImageUrl(img)}
-                                                alt={`${data.name} - Image ${index + 1}`}
-                                                style={{
-                                                    width: '100%',
-                                                    height: '100%',
-                                                    objectFit: 'cover'
-                                                }}
-                                                onError={(e) => {
-                                                    e.target.onerror = null;
-                                                    e.target.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect width="100" height="100" fill="%23ddd"/%3E%3Ctext x="50%25" y="50%25" dominant-baseline="middle" text-anchor="middle" font-family="sans-serif" font-size="12" fill="%23999"%3ENo Image%3C/text%3E%3C/svg%3E';
-                                                }}
-                                            />
-                                        </div>
-                                    </Col>
-                                ))
-                            ) : (
-                                <Col xs={12}>
-                                    <p className="text-muted">No images available</p>
-                                </Col>
-                            )}
-                        </Row>
-                    </Col>
-
-                    {/* Product Details */}
-                    <Col md={6}>
-                        <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>📋 Product Details</h6>
-
-                        <div className="mb-3">
-                            <strong>Description:</strong>
-                            <p className="mt-1" style={{ color: '#555' }}>{data?.description || 'N/A'}</p>
-                        </div>
-
-                        <Row>
-                            <Col md={6} className="mb-2">
-                                <strong>Category:</strong> {categoryName}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Sub Category:</strong> {subCategoryName}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Price:</strong> <span style={{ color: '#28a745', fontWeight: 'bold' }}>₹{data?.price}</span>
-                                {data?.discountPrice && (
-                                    <span style={{ color: '#dc3545', marginLeft: '10px', fontSize: '0.9em' }}>
-                                        (Discount: ₹{data.discountPrice})
-                                    </span>
-                                )}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Stock:</strong> {data?.stock || 0} units
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Available Sizes:</strong> {data?.sizes?.join(', ') || 'N/A'}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Bestseller:</strong> {data?.bestseller || data?.bestSeller ? '✅ Yes' : '❌ No'}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Sold Out:</strong> {data?.soldOut ? '🔴 Yes' : '🟢 No'}
-                            </Col>
-                            <Col md={6} className="mb-2">
-                                <strong>Rating:</strong> {data?.rating || 0} ⭐ ({data?.reviewCount || 0} reviews)
-                            </Col>
-                        </Row>
-
-                        {/* Ingredients */}
-                        {data?.ingredients && data.ingredients.length > 0 && (
-                            <div className="mt-3">
-                                <strong>🧪 Ingredients:</strong>
-                                <ul className="mt-1" style={{ paddingLeft: '20px' }}>
-                                    {data.ingredients.map((ing, idx) => (
-                                        <li key={idx}>{ing}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* Benefits */}
-                        {data?.benefits && data.benefits.length > 0 && (
-                            <div className="mt-3">
-                                <strong>✨ Benefits:</strong>
-                                <ul className="mt-1" style={{ paddingLeft: '20px' }}>
-                                    {data.benefits.map((ben, idx) => (
-                                        <li key={idx}>{ben}</li>
-                                    ))}
-                                </ul>
-                            </div>
-                        )}
-
-                        {/* How to Use */}
-                        {data?.howToUse && (
-                            <div className="mt-3">
-                                <strong>📖 How to Use:</strong>
-                                <p className="mt-1" style={{ color: '#555' }}>{data.howToUse}</p>
-                            </div>
-                        )}
-
-                        {/* Timestamps */}
-                        <div className="mt-3" style={{ fontSize: '12px', color: '#6c757d' }}>
-                            <div><strong>Created:</strong> {moment(data?.createdAt).format("DD-MMM-YYYY, hh:mm A")}</div>
-                            <div><strong>Updated:</strong> {moment(data?.updatedAt).format("DD-MMM-YYYY, hh:mm A")}</div>
-                        </div>
-                    </Col>
-                </Row>
-            </div>
-        );
-    };
+    const [viewProduct, setViewProduct] = useState(null);
 
     useEffect(() => {
         // Get products on component mount (no auth required for list)
@@ -306,7 +341,25 @@ function Product() {
                 ),
                 name: 'Status',
                 ignoreRowClick: true,
-                maxWidth: '110px'
+                minWidth: '120px',
+                width: '120px',
+                center: true,
+            },
+            {
+                name: 'View',
+                width: '72px',
+                center: true,
+                ignoreRowClick: true,
+                cell: (row) => (
+                    <button
+                        type="button"
+                        className="order-action-btn order-action-btn--view"
+                        title="View product details"
+                        onClick={() => setViewProduct(row)}
+                    >
+                        <i className="ri-eye-line" />
+                    </button>
+                ),
             },
             {
                 cell: (row) => (
@@ -465,7 +518,6 @@ function Product() {
 
     return (
         <>
-            {loading && <Loader />}
             <Header />
             <div className="main main-app p-3 p-lg-4">
                 <div className="d-md-flex align-items-center justify-content-between mb-4">
@@ -496,7 +548,7 @@ function Product() {
                                         <input
                                             type="text"
                                             className="form-control"
-                                            placeholder="🔍 Search products..."
+                                            placeholder="Search products…"
                                             value={filters.search}
                                             onChange={(e) => setFilters({ ...filters, search: e.target.value, page: 1 })}
                                         />
@@ -584,7 +636,8 @@ function Product() {
                                             variant="outline-secondary"
                                             className="w-100"
                                         >
-                                            🔄 Reset Filters
+                                            <i className="ri-refresh-line me-1" />
+                                            Reset Filters
                                         </Button>
                                     </Col>
                                     <Col md={6} className="text-end">
@@ -611,24 +664,27 @@ function Product() {
                                     </Col>
                                 </Row>
 
+                                <div className="table-responsive admin-datatable-scroll">
                                 <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                                     columns={columns}
                                     data={data}
                                     pagination
                                     paginationPerPage={filters.limit}
                                     paginationRowsPerPageOptions={[10, 20, 30, 50]}
+                                    paginationComponentOptions={dataTablePaginationOptions}
                                     paginationServer
                                     paginationTotalRows={pagination.totalProducts}
                                     onChangePage={(page) => setFilters({ ...filters, page })}
                                     onChangeRowsPerPage={(newLimit) => setFilters({ ...filters, limit: newLimit, page: 1 })}
+                                    customStyles={dataTableProductStyles}
                                     highlightOnHover
-                                    responsive
                                     striped
-                                    expandableRows
-                                    expandableRowsComponent={ExpandedComponent}
-                                    expandOnRowClicked
-                                    expandableRowsHideExpander={false}
+                                    fixedHeader
+                                    fixedHeaderScrollHeight="480px"
                                 />
+                                </div>
 
                                 {/* Pagination Info */}
                                 {pagination.totalProducts > 0 && (
@@ -642,6 +698,15 @@ function Product() {
                         </Card>
                     </Col>
                 </Row>
+
+                <Modal isOpen={Boolean(viewProduct)} toggle={() => setViewProduct(null)} size="lg" centered>
+                    <ModalHeader toggle={() => setViewProduct(null)}>
+                        Product Details — {viewProduct?.name || 'Product'}
+                    </ModalHeader>
+                    <ModalBody>
+                        {viewProduct && <ProductDetailsContent product={viewProduct} />}
+                    </ModalBody>
+                </Modal>
 
                 {/* Confirm Modal */}
                 <ConfirmModal

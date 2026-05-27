@@ -6,6 +6,7 @@ import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import { Button } from 'react-bootstrap';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import Footer from '../../layouts/Footer';
 import Loader from '../../layouts/Loader';
 import moment from "moment";
@@ -121,6 +122,8 @@ function PetCategory() {
                         </Col>
                     </Row>
                     <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                         columns={columns}
                         data={data}
                         pagination

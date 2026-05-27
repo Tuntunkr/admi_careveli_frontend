@@ -1,451 +1,667 @@
-import React, { useEffect, useState, useRef } from 'react'
-import Header from '../../layouts/Header'
-import { Card, CardBody, CardSubtitle, CardTitle, Row, Col, Modal, ModalBody, Input, Button, FormGroup, Label } from 'reactstrap'
-import { getAllUsers } from '../../helper/admin_helper';
+import React, { useEffect, useState, useCallback, useMemo } from 'react';
+import { Link } from 'react-router-dom';
+import Header from '../../layouts/Header';
+import { Card, CardBody, Row, Col, Input, FormGroup, Label, Modal, ModalHeader, ModalBody } from 'reactstrap';
+import { Button, Pagination } from 'react-bootstrap';
+import { getAllUsers, parseAllUsersResponse } from '../../helper/admin_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import Footer from '../../layouts/Footer';
-import Loader from '../../layouts/Loader';
+import AdminEmptyState from '../../components/admin/AdminEmptyState';
+import { dataTableCustomStyles } from '../../components/admin/dataTableConfig';
 import moment from 'moment';
-import defaultProfilePic from "../../assets/images/user.png";
+
+function getAdminToken(userState) {
+    const nested = userState?.user || userState;
+    return nested?.token || localStorage.getItem('adminToken') || '';
+}
+
+function getInitials(name = '') {
+    const parts = String(name).trim().split(/\s+/).filter(Boolean);
+    if (!parts.length) return '?';
+    if (parts.length === 1) return parts[0].charAt(0).toUpperCase();
+    return `${parts[0].charAt(0)}${parts[parts.length - 1].charAt(0)}`.toUpperCase();
+}
+
+function formatPhone(phone) {
+    if (!phone) return '—';
+    const s = String(phone).trim();
+    if (s.startsWith('+')) return s;
+    if (/^\d{10}$/.test(s)) return `+91 ${s}`;
+    return s;
+}
+
+function UserDetailsContent({ user: row }) {
+    if (!row) return null;
+
+    const name = row.name || row.userName || '—';
+    const email = row.email || row.emailId;
+    const phone = formatPhone(row.phone || row.mobile);
+
+    return (
+        <div className="user-details-modal">
+            <div className="d-flex align-items-center gap-3 mb-4 pb-3 border-bottom">
+                <span className="user-avatar-initials" style={{ width: 48, height: 48, fontSize: '1rem' }}>
+                    {getInitials(name)}
+                </span>
+                <div>
+                    <h5 className="mb-1 fw-bold">{name}</h5>
+                    <div className="d-flex flex-wrap gap-2">
+                        <span className={`badge rounded-pill ${row.role === 'Admin' ? 'bg-danger' : 'bg-primary'}`}>
+                            {row.role || 'User'}
+                        </span>
+                        <span className={`badge rounded-pill ${row.isActive !== false ? 'bg-success' : 'bg-secondary'}`}>
+                            {row.isActive !== false ? 'Active' : 'Inactive'}
+                        </span>
+                    </div>
+                </div>
+            </div>
+
+            <Row className="g-3 mb-4">
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">User ID</small>
+                    <code className="small d-block text-break">{row._id || '—'}</code>
+                </Col>
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">Full name</small>
+                    <span className="fw-medium">{name}</span>
+                </Col>
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">Email</small>
+                    {email ? (
+                        <a href={`mailto:${email}`} className="text-break">{email}</a>
+                    ) : (
+                        <span>—</span>
+                    )}
+                </Col>
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">Mobile</small>
+                    <span>{phone}</span>
+                </Col>
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">Joined</small>
+                    <span>
+                        {row.createdAt
+                            ? moment(row.createdAt).format('DD MMM YYYY, hh:mm A')
+                            : '—'}
+                    </span>
+                </Col>
+                <Col md={6}>
+                    <small className="text-muted d-block mb-1">Last updated</small>
+                    <span>
+                        {row.updatedAt
+                            ? moment(row.updatedAt).format('DD MMM YYYY, hh:mm A')
+                            : '—'}
+                    </span>
+                </Col>
+            </Row>
+
+            <div className="mb-4">
+                <h6 className="fw-semibold mb-2">
+                    <i className="ri-wallet-3-line me-1" />
+                    Payment summary
+                </h6>
+                <div className="d-flex flex-wrap gap-2">
+                    <span className="badge bg-success">
+                        Successful: {row?.activity?.paymentStatuses?.success ?? 0}
+                    </span>
+                    <span className="badge bg-danger">
+                        Failed: {row?.activity?.paymentStatuses?.failed ?? 0}
+                    </span>
+                    <span className="badge bg-warning text-dark">
+                        Pending: {row?.activity?.paymentStatuses?.pending ?? 0}
+                    </span>
+                    <span className="badge bg-light text-dark border">
+                        Total spent: ₹{row?.activity?.totalPaymentAmount ?? 0}
+                    </span>
+                    <span className="badge bg-light text-dark border">
+                        Orders: {row?.activity?.totalOrdersCount ?? 0}
+                    </span>
+                </div>
+            </div>
+
+            <div>
+                <h6 className="fw-semibold mb-2">
+                    <i className="ri-shopping-bag-line me-1" />
+                    Order history
+                </h6>
+                {row?.activity?.orderHistory?.length > 0 ? (
+                    <div className="table-responsive">
+                        <table className="table table-sm table-bordered mb-0">
+                            <thead className="table-light">
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Date</th>
+                                    <th>Amount</th>
+                                    <th>Status</th>
+                                    <th>Payment</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {row.activity.orderHistory.map((order, idx) => (
+                                    <tr key={order._id || idx}>
+                                        <td className="small">{order.orderNumber}</td>
+                                        <td className="small">{moment(order.date).format('DD MMM YYYY')}</td>
+                                        <td className="small">₹{order.amount}</td>
+                                        <td><span className="badge bg-primary">{order.status}</span></td>
+                                        <td><span className="badge bg-secondary">{order.paymentStatus}</span></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                ) : (
+                    <p className="text-muted small mb-0 py-3 text-center bg-light rounded">
+                        No order history for this user.
+                    </p>
+                )}
+            </div>
+        </div>
+    );
+}
 
 function Registered() {
+    const userState = useSelector(state => state.user);
+    const token = getAdminToken(userState);
 
-    const user = useSelector(state => state.user);
     const [loading, setLoading] = useState(false);
     const [data, setData] = useState([]);
-    const [columns, setColumns] = useState([]);
 
-    // Pagination and filters state
     const [currentPage, setCurrentPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
     const [totalUsers, setTotalUsers] = useState(0);
     const [perPage, setPerPage] = useState(10);
     const [searchTerm, setSearchTerm] = useState('');
     const [roleFilter, setRoleFilter] = useState('');
-    const searchTimeoutRef = useRef(null);
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [viewUser, setViewUser] = useState(null);
+
+    const pageStats = useMemo(() => {
+        const activeOnPage = data.filter(u => u.isActive !== false).length;
+        const adminsOnPage = data.filter(u => u.role === 'Admin').length;
+        const withOrders = data.filter(u => (u?.activity?.totalOrdersCount ?? 0) > 0).length;
+        return { activeOnPage, adminsOnPage, withOrders };
+    }, [data]);
+
+    const hasActiveFilters = Boolean(debouncedSearch || roleFilter || perPage !== 10);
+
+    const columns = useMemo(() => [
+        {
+            name: '#',
+            cell: (row, index) => (
+                <span className="text-muted small">{(currentPage - 1) * perPage + index + 1}</span>
+            ),
+            width: '56px',
+        },
+        {
+            name: 'User',
+            minWidth: '200px',
+            grow: 1,
+            cell: row => {
+                const name = row.name || row.userName || 'Unknown';
+                return (
+                    <div className="d-flex align-items-center gap-2 py-1">
+                        <span className="user-avatar-initials" aria-hidden="true">
+                            {getInitials(name)}
+                        </span>
+                        <div className="user-cell-name min-w-0">
+                            <div className="fw-semibold text-truncate">{name}</div>
+                            <div className="user-cell-sub text-truncate">
+                                ID: {(row._id || '').slice(-8) || '—'}
+                            </div>
+                        </div>
+                    </div>
+                );
+            },
+        },
+        {
+            name: 'Email',
+            minWidth: '220px',
+            grow: 1,
+            cell: row => {
+                const email = row.email || row.emailId;
+                if (!email) return <span className="text-muted">—</span>;
+                return (
+                    <div className="d-flex align-items-center gap-2 min-w-0">
+                        <a
+                            href={`mailto:${email}`}
+                            className="text-truncate text-decoration-none"
+                            style={{ maxWidth: '180px' }}
+                            title={email}
+                        >
+                            {email}
+                        </a>
+                        <button
+                            type="button"
+                            className="btn btn-sm btn-light border-0 p-1 flex-shrink-0"
+                            title="Copy email"
+                            onClick={e => {
+                                e.stopPropagation();
+                                navigator.clipboard.writeText(email);
+                                toast.success('Email copied');
+                            }}
+                        >
+                            <i className="ri-file-copy-line text-primary" />
+                        </button>
+                    </div>
+                );
+            },
+        },
+        {
+            name: 'Mobile',
+            width: '140px',
+            cell: row => (
+                <span className="text-nowrap small">{formatPhone(row.phone || row.mobile)}</span>
+            ),
+        },
+        {
+            name: 'Role',
+            width: '88px',
+            cell: row => (
+                <span className={`badge rounded-pill ${row.role === 'Admin' ? 'bg-danger' : 'bg-primary'}`}>
+                    {row.role || 'User'}
+                </span>
+            ),
+        },
+        {
+            name: 'Status',
+            width: '92px',
+            cell: row => (
+                <span className={`badge rounded-pill ${row.isActive !== false ? 'bg-success' : 'bg-secondary'}`}>
+                    {row.isActive !== false ? 'Active' : 'Inactive'}
+                </span>
+            ),
+        },
+        {
+            name: 'Joined',
+            width: '118px',
+            cell: row => {
+                const date = row?.createdAt || row?.updatedAt;
+                if (!date) return '—';
+                const m = moment(date);
+                return (
+                    <span className="small text-nowrap" title={m.format('DD MMM YYYY, hh:mm A')}>
+                        {m.format('DD MMM YYYY')}
+                    </span>
+                );
+            },
+        },
+        {
+            name: 'Activity',
+            width: '110px',
+            cell: row => {
+                const orders = row?.activity?.totalOrdersCount ?? 0;
+                const spent = row?.activity?.totalPaymentAmount ?? 0;
+                return (
+                    <div className="small">
+                        <div>
+                            <i className="ri-shopping-bag-line me-1 text-muted" />
+                            {orders} {orders === 1 ? 'order' : 'orders'}
+                        </div>
+                        <div className="text-success fw-medium">₹{spent}</div>
+                    </div>
+                );
+            },
+        },
+        {
+            name: 'Actions',
+            width: '80px',
+            ignoreRowClick: true,
+            cell: row => (
+                <Button
+                    size="sm"
+                    variant="outline-primary"
+                    className="order-action-btn order-action-btn--view"
+                    title="View user details"
+                    onClick={() => setViewUser(row)}
+                >
+                    <i className="ri-eye-line" />
+                </Button>
+            ),
+        },
+    ], [currentPage, perPage]);
+
+    const fetchUsers = useCallback(async () => {
+        if (!token) {
+            toast.error('Please sign in again — admin token missing');
+            setData([]);
+            setTotalUsers(0);
+            return;
+        }
+
+        setLoading(true);
+
+        const params = { page: currentPage, limit: perPage };
+        if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
+        if (roleFilter) params.role = roleFilter;
+
+        try {
+            const res = await getAllUsers(token, params);
+            const { users, pagination, totalUsers: total, error } = parseAllUsersResponse(res);
+
+            if (error) {
+                toast.error(error);
+                setData([]);
+                setTotalUsers(0);
+                setTotalPages(1);
+                return;
+            }
+
+            setData(users);
+            setTotalUsers(total);
+
+            if (pagination) {
+                setCurrentPage(pagination.currentPage || currentPage);
+                setTotalPages(Math.max(pagination.totalPages || 1, 1));
+            } else {
+                setTotalPages(Math.max(Math.ceil(total / perPage) || 1, 1));
+            }
+        } catch (err) {
+            console.error('Error fetching users:', err);
+            toast.error('Failed to load registered users');
+            setData([]);
+        } finally {
+            setLoading(false);
+        }
+    }, [token, currentPage, perPage, debouncedSearch, roleFilter]);
 
     useEffect(() => {
-        console.log('=== Registered Component Mounted ===');
-        console.log('User object:', user);
-        console.log('User token:', user?.token);
-
-        if (user?.token) {
-            console.log('Token found, calling getData()');
-            getData();
-        } else {
-            console.warn('No token found in user object');
-        }
-    }, [user, currentPage, perPage, roleFilter]);
-
-    // Handle search with debounce
-    useEffect(() => {
-        if (searchTimeoutRef.current) {
-            clearTimeout(searchTimeoutRef.current);
-        }
-
-        searchTimeoutRef.current = setTimeout(() => {
-            if (user?.token) {
-                setCurrentPage(1); // Reset to first page on search
-                getData();
-            }
-        }, 500);
-
-        return () => {
-            if (searchTimeoutRef.current) {
-                clearTimeout(searchTimeoutRef.current);
-            }
-        };
+        const id = setTimeout(() => setDebouncedSearch(searchTerm), 400);
+        return () => clearTimeout(id);
     }, [searchTerm]);
 
     useEffect(() => {
-        setColumns([
-            {
-                name: 'Sl.No',
-                cell: (row, index) => <>
-                    <span>{(currentPage - 1) * perPage + index + 1}</span>
-                </>,
-                maxWidth: '70px'
+        setCurrentPage(1);
+    }, [debouncedSearch]);
 
-            },
-            {
-                name: 'Name',
-                cell: (row, index) => <>
-                    <p className='mb-0'>{row.name || row.userName || 'N/A'}</p>
-                </>,
-                minWidth: '150px'
-            },
-            {
-                name: 'Email',
-                cell: (row, index) => <>
-                    <div className="d-flex align-items-center">
-                        <p className='mb-0 me-2'>{row.email || row.emailId || 'N/A'}</p>
-                        {(row.email || row.emailId) && (
-                            <i
-                                className="ri-file-copy-line text-primary cursor-pointer"
-                                style={{ cursor: 'pointer' }}
-                                title="Copy Email"
-                                onClick={() => {
-                                    navigator.clipboard.writeText(row.email || row.emailId);
-                                    toast.success("Email copied to clipboard!");
-                                }}
-                            ></i>
-                        )}
-                    </div>
-                </>,
-                minWidth: '200px'
-            },
-            {
-                name: 'Mobile',
-                cell: (row) => <>
-                    <p className='mb-0'>{row.phone || row.mobile || 'N/A'}</p>
-                </>,
-                minWidth: '140px'
-            },
-            {
-                name: 'Role',
-                cell: (row) => <>
-                    <span className={`badge ${row.role === 'Admin' ? 'bg-danger' : 'bg-primary'}`}>
-                        {row.role || 'User'}
-                    </span>
-                </>,
-                maxWidth: '100px'
-            },
-            {
-                name: 'Status',
-                cell: (row) => <>
-                    <span className={`badge ${row.isActive ? 'bg-success' : 'bg-secondary'}`}>
-                        {row.isActive ? 'Active' : 'Inactive'}
-                    </span>
-                </>,
-                maxWidth: '100px'
-            },
-            {
-                name: 'Added On',
-                selector: row => moment(row?.createdAt || row?.updatedAt).format("DD-MMM-YYYY"),
-                minWidth: '130px'
-            },
-            {
-                name: 'Total Orders',
-                cell: (row) => <span>{row?.activity?.totalOrdersCount || 0}</span>,
-                minWidth: '110px'
-            },
-            {
-                name: 'Total Spent',
-                cell: (row) => <span>₹{row?.activity?.totalPaymentAmount || 0}</span>,
-                minWidth: '110px'
-            }
-        ])
-    }, [data, currentPage, perPage]);
+    useEffect(() => {
+        fetchUsers();
+    }, [fetchUsers]);
 
-    const getData = () => {
-        if (!loading) {
-            setLoading(true);
+    const resetFilters = () => {
+        setSearchTerm('');
+        setDebouncedSearch('');
+        setRoleFilter('');
+        setCurrentPage(1);
+        setPerPage(10);
+    };
 
-            // Build query parameters object
-            const params = {
-                page: currentPage,
-                limit: perPage
-            };
-
-            if (searchTerm) {
-                params.search = searchTerm;
-            }
-
-            if (roleFilter) {
-                params.role = roleFilter;
-            }
-
-            console.log('Fetching users with params:', params);
-            console.log('User token:', user?.token ? 'Token exists' : 'No token');
-
-            // Call API using admin_helper
-            getAllUsers(user?.token, params)
-                .then(res => {
-                    console.log('API Response:', res);
-                    setLoading(false);
-
-                    if (res?.success && res?.data) {
-                        console.log('Users data:', res.data.users);
-                        console.log('Total users:', res.data.pagination?.totalUsers || res.data.totalUsers);
-
-                        setData(res.data.users || []);
-
-                        // Update pagination info
-                        if (res.data.pagination) {
-                            setCurrentPage(res.data.pagination.currentPage);
-                            setTotalPages(res.data.pagination.totalPages);
-                            setTotalUsers(res.data.pagination.totalUsers);
-
-                            console.log('Pagination updated:', {
-                                currentPage: res.data.pagination.currentPage,
-                                totalPages: res.data.pagination.totalPages,
-                                totalUsers: res.data.pagination.totalUsers
-                            });
-                        } else if (res.data.totalUsers !== undefined) {
-                            // Fallback for response without pagination object
-                            setTotalUsers(res.data.totalUsers);
-                        }
-
-                        console.log('State should be updated now. Data length:', res.data.users?.length);
-                    } else {
-                        console.error('API Error:', res);
-                        toast.error(res?.message || "Failed to fetch users");
-                    }
-                })
-                .catch(err => {
-                    setLoading(false);
-                    console.error("Error fetching users:", err);
-                    toast.error("Something Went Wrong!");
-                })
+    const exportCsv = () => {
+        if (!data.length) {
+            toast.warning('No users on this page to export');
+            return;
         }
-    }
+        const header = ['Name', 'Email', 'Mobile', 'Role', 'Status', 'Joined', 'Orders', 'Total Spent'];
+        const rows = data.map(row => [
+            row.name || row.userName || '',
+            row.email || row.emailId || '',
+            row.phone || row.mobile || '',
+            row.role || 'User',
+            row.isActive !== false ? 'Active' : 'Inactive',
+            row.createdAt ? moment(row.createdAt).format('YYYY-MM-DD') : '',
+            row?.activity?.totalOrdersCount ?? 0,
+            row?.activity?.totalPaymentAmount ?? 0,
+        ]);
+        const csv = [header, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+        const blob = new Blob([csv], { type: 'text/csv' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `registered-users-page-${currentPage}.csv`;
+        a.click();
+        URL.revokeObjectURL(url);
+        toast.success('CSV exported');
+    };
 
-    const ExpandedComponent = ({ data }) =>
-        <div className='expending_box' style={{ padding: '15px', backgroundColor: '#f8f9fa' }}>
-            <Row>
-                <Col lg={3} md={6}>
-                    <div className='expend_detail mb-2'>
-                        <h6 className='mb-1'><strong>User ID:</strong></h6>
-                        <p className='mb-0 text-muted' style={{ fontSize: '0.9rem' }}>{data?._id || 'N/A'}</p>
-                    </div>
-                </Col>
-                <Col lg={3} md={6}>
-                    <div className='expend_detail mb-2'>
-                        <h6 className='mb-1'><strong>Status Breakdown:</strong></h6>
-                        <p className='mb-0'>
-                            <span className="badge bg-success me-1 cursor-pointer" title="Success">S: {data?.activity?.paymentStatuses?.success || 0}</span>
-                            <span className="badge bg-danger me-1 cursor-pointer" title="Failed">F: {data?.activity?.paymentStatuses?.failed || 0}</span>
-                            <span className="badge bg-warning text-dark cursor-pointer" title="Pending">P: {data?.activity?.paymentStatuses?.pending || 0}</span>
-                        </p>
-                    </div>
-                </Col>
-                <Col lg={3} md={6}>
-                    <div className='expend_detail mb-2'>
-                        <h6 className='mb-1'><strong>Total Spent:</strong></h6>
-                        <p className='mb-0 text-muted' style={{ fontSize: '0.9rem' }}>
-                            ₹{data?.activity?.totalPaymentAmount || 0}
-                        </p>
-                    </div>
-                </Col>
-                <Col lg={3} md={6}>
-                    <div className='expend_detail mb-2'>
-                        <h6 className='mb-1'><strong>Updated At:</strong></h6>
-                        <p className='mb-0 text-muted' style={{ fontSize: '0.9rem' }}>
-                            {moment(data?.updatedAt).format("DD-MMM-YYYY hh:mm A")}
-                        </p>
-                    </div>
-                </Col>
-            </Row>
-            {data?.activity?.orderHistory?.length > 0 && (
-                <Row className="mt-3">
-                    <Col>
-                        <h6 className="mb-2"><strong>Order History:</strong></h6>
-                        <div className="table-responsive">
-                            <table className="table table-sm table-bordered">
-                                <thead className="table-light">
-                                    <tr>
-                                        <th>Order Number</th>
-                                        <th>Date</th>
-                                        <th>Amount</th>
-                                        <th>Status</th>
-                                        <th>Payment Status</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {data.activity.orderHistory.map((order, idx) => (
-                                        <tr key={idx}>
-                                            <td>{order.orderNumber}</td>
-                                            <td>{moment(order.date).format("DD-MMM-YYYY")}</td>
-                                            <td>₹{order.amount}</td>
-                                            <td><span className={`badge ${order.status === 'Delivered' ? 'bg-success' : 'bg-primary'}`}>{order.status}</span></td>
-                                            <td><span className={`badge ${order.paymentStatus === 'SUCCESS' ? 'bg-success' : 'bg-warning'}`}>{order.paymentStatus}</span></td>
-                                        </tr>
-                                    ))}
-                                </tbody>
-                            </table>
-                        </div>
-                    </Col>
-                </Row>
-            )}
-        </div>
+    const paginationItems = useMemo(() => {
+        const items = [];
+        const maxVisible = 5;
+        let start = Math.max(1, currentPage - 2);
+        let end = Math.min(totalPages, start + maxVisible - 1);
+        start = Math.max(1, end - maxVisible + 1);
+
+        for (let p = start; p <= end; p += 1) {
+            items.push(
+                <Pagination.Item key={p} active={p === currentPage} onClick={() => setCurrentPage(p)}>
+                    {p}
+                </Pagination.Item>
+            );
+        }
+        return items;
+    }, [currentPage, totalPages]);
+
+    const rangeStart = totalUsers > 0 ? (currentPage - 1) * perPage + 1 : 0;
+    const rangeEnd = Math.min(currentPage * perPage, totalUsers);
 
     return (
         <React.Fragment>
             <Header />
 
-            {
-                loading == true && <Loader />
-            }
+            <div className="main main-app p-3 p-lg-4 registered-users-page">
+                <div className="main-page-header d-flex flex-wrap align-items-center justify-content-between gap-2 mb-3">
+                    <div>
+                        <ol className="breadcrumb fs-sm mb-1">
+                            <li className="breadcrumb-item">
+                                <Link to="/admin/dashboard">Dashboard</Link>
+                            </li>
+                            <li className="breadcrumb-item active" aria-current="page">
+                                Registered Users
+                            </li>
+                        </ol>
+                        <p className="text-muted small mb-0">
+                            Manage customers who signed up on Careveli
+                        </p>
+                    </div>
+                    <div className="d-flex gap-2">
+                        <Button variant="outline-secondary" size="sm" onClick={exportCsv} disabled={!data.length}>
+                            <i className="ri-download-2-line me-1" />
+                            Export CSV
+                        </Button>
+                        <Button variant="primary" size="sm" onClick={fetchUsers} disabled={loading}>
+                            <i className={`ri-refresh-line me-1 ${loading ? 'spin' : ''}`} />
+                            Refresh
+                        </Button>
+                    </div>
+                </div>
 
-            <div className="main main-app p-3 p-lg-4">
-                <Card>
-                    <CardBody>
-                        <Row className='mb-3'>
-                            <Col md={12}>
-                                <CardTitle tag="h4"><b>Registered Users</b></CardTitle>
-                                <CardSubtitle className='text-muted'>
-                                    Total Users: {totalUsers} | Page {currentPage} of {totalPages}
-                                </CardSubtitle>
-                            </Col>
-                        </Row>
+                <Row className="g-3 mb-3 registered-users-stats">
+                    <Col xs={6} md={3}>
+                        <Card className="registered-stat-card h-100" style={{ '--stat-accent': '#2563eb' }}>
+                            <CardBody className="d-flex align-items-center justify-content-between py-3">
+                                <div>
+                                    <div className="text-muted small">Total users</div>
+                                    <div className="fs-4 fw-bold">{totalUsers}</div>
+                                </div>
+                                <div className="registered-stat-card__icon" style={{ background: '#dbeafe', color: '#2563eb' }}>
+                                    <i className="ri-group-line" />
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </Col>
+                    <Col xs={6} md={3}>
+                        <Card className="registered-stat-card h-100" style={{ '--stat-accent': '#16a34a' }}>
+                            <CardBody className="d-flex align-items-center justify-content-between py-3">
+                                <div>
+                                    <div className="text-muted small">Active (this page)</div>
+                                    <div className="fs-4 fw-bold">{pageStats.activeOnPage}</div>
+                                </div>
+                                <div className="registered-stat-card__icon" style={{ background: '#dcfce7', color: '#16a34a' }}>
+                                    <i className="ri-user-follow-line" />
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </Col>
+                    <Col xs={6} md={3}>
+                        <Card className="registered-stat-card h-100" style={{ '--stat-accent': '#9333ea' }}>
+                            <CardBody className="d-flex align-items-center justify-content-between py-3">
+                                <div>
+                                    <div className="text-muted small">With orders</div>
+                                    <div className="fs-4 fw-bold">{pageStats.withOrders}</div>
+                                </div>
+                                <div className="registered-stat-card__icon" style={{ background: '#f3e8ff', color: '#9333ea' }}>
+                                    <i className="ri-shopping-cart-2-line" />
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </Col>
+                    <Col xs={6} md={3}>
+                        <Card className="registered-stat-card h-100" style={{ '--stat-accent': '#dc2626' }}>
+                            <CardBody className="d-flex align-items-center justify-content-between py-3">
+                                <div>
+                                    <div className="text-muted small">Admins (this page)</div>
+                                    <div className="fs-4 fw-bold">{pageStats.adminsOnPage}</div>
+                                </div>
+                                <div className="registered-stat-card__icon" style={{ background: '#fee2e2', color: '#dc2626' }}>
+                                    <i className="ri-shield-user-line" />
+                                </div>
+                            </CardBody>
+                        </Card>
+                    </Col>
+                </Row>
 
-                        {/* Filters Section */}
-                        <Row className='mb-3'>
-                            <Col md={4}>
-                                <FormGroup>
-                                    <Label for="searchInput">Search Users</Label>
-                                    <Input
-                                        type="text"
-                                        id="searchInput"
-                                        placeholder="Search by name, email, or phone..."
-                                        value={searchTerm}
-                                        onChange={(e) => setSearchTerm(e.target.value)}
-                                    />
+                <Card className="border-0 shadow-sm">
+                    <CardBody className="pb-0">
+                        <Row className="g-2 align-items-end admin-filter-toolbar mb-2">
+                            <Col md={4} sm={6}>
+                                <FormGroup className="mb-0">
+                                    <Label for="searchInput">Search</Label>
+                                    <div className="admin-search-wrap">
+                                        <i className="ri-search-line admin-search-icon" />
+                                        <Input
+                                            id="searchInput"
+                                            type="search"
+                                            className="form-control"
+                                            placeholder="Name, email, or phone…"
+                                            value={searchTerm}
+                                            onChange={e => setSearchTerm(e.target.value)}
+                                        />
+                                    </div>
                                 </FormGroup>
                             </Col>
-                            <Col md={3}>
-                                <FormGroup>
-                                    <Label for="roleFilter">Filter by Role</Label>
-                                    <Input
-                                        type="select"
-                                        id="roleFilter"
-                                        value={roleFilter}
-                                        onChange={(e) => {
-                                            setRoleFilter(e.target.value);
-                                            setCurrentPage(1);
-                                        }}
-                                    >
-                                        <option value="">All Roles</option>
+                            <Col md={2} sm={3}>
+                                <FormGroup className="mb-0">
+                                    <Label for="roleFilter">Role</Label>
+                                    <Input id="roleFilter" type="select" value={roleFilter} onChange={e => {
+                                        setRoleFilter(e.target.value);
+                                        setCurrentPage(1);
+                                    }}>
+                                        <option value="">All roles</option>
                                         <option value="User">User</option>
                                         <option value="Admin">Admin</option>
                                     </Input>
                                 </FormGroup>
                             </Col>
-                            <Col md={2}>
-                                <FormGroup>
-                                    <Label for="perPageSelect">Per Page</Label>
-                                    <Input
-                                        type="select"
-                                        id="perPageSelect"
-                                        value={perPage}
-                                        onChange={(e) => {
-                                            setPerPage(Number(e.target.value));
-                                            setCurrentPage(1);
-                                        }}
-                                    >
-                                        <option value="10">10</option>
-                                        <option value="20">20</option>
-                                        <option value="50">50</option>
-                                        <option value="100">100</option>
+                            <Col md={2} sm={3}>
+                                <FormGroup className="mb-0">
+                                    <Label for="perPageSelect">Per page</Label>
+                                    <Input id="perPageSelect" type="select" value={perPage} onChange={e => {
+                                        setPerPage(Number(e.target.value));
+                                        setCurrentPage(1);
+                                    }}>
+                                        <option value={10}>10</option>
+                                        <option value={20}>20</option>
+                                        <option value={50}>50</option>
+                                        <option value={100}>100</option>
                                     </Input>
                                 </FormGroup>
                             </Col>
-                            <Col md={3} className='d-flex align-items-end'>
-                                <FormGroup className='w-100'>
-                                    <Button
-                                        color="primary"
-                                        onClick={() => {
-                                            setSearchTerm('');
-                                            setRoleFilter('');
-                                            setCurrentPage(1);
-                                            setPerPage(10);
-                                        }}
-                                        className='w-100'
-                                    >
-                                        Reset Filters
-                                    </Button>
-                                </FormGroup>
+                            <Col md={4} sm={12} className="d-flex gap-2 justify-content-md-end">
+                                <Button
+                                    variant="outline-secondary"
+                                    size="sm"
+                                    className="flex-grow-1 flex-md-grow-0"
+                                    onClick={resetFilters}
+                                    disabled={!hasActiveFilters && !searchTerm}
+                                >
+                                    <i className="ri-filter-off-line me-1" />
+                                    Reset
+                                </Button>
                             </Col>
                         </Row>
 
-                        {/* Data Table */}
-                        <DataTable
-                            columns={columns}
-                            data={data}
-                            pagination={false}
-                            expandableRows={true}
-                            expandOnRowClicked={false}
-                            expandableRowDisabled={row => row.disabled}
-                            expandableRowsComponent={ExpandedComponent}
-                            expandableRowsComponentProps={row => row.Action}
-                            conditionalRowStyles={[{
-                                when: row => row?.style,
-                                style: row => ({ width: row?.style?.width }),
-                            },
-                            ]}
-                            customStyles={{
-                                headCells: {
-                                    style: {
-                                        color: 'black',
-                                        fontWeight: 'bold',
-                                        fontSize: 15,
-                                        width: 0
-                                    },
-                                },
-                                cells: {
-                                    style: {
-                                        width: 0
-                                    }
+                        {hasActiveFilters && (
+                            <div className="filter-chips mb-3">
+                                <span className="text-muted small me-1">Filters:</span>
+                                {debouncedSearch && (
+                                    <span className="filter-chip">
+                                        Search: {debouncedSearch}
+                                        <button type="button" onClick={() => setSearchTerm('')} aria-label="Clear search">×</button>
+                                    </span>
+                                )}
+                                {roleFilter && (
+                                    <span className="filter-chip">
+                                        Role: {roleFilter}
+                                        <button type="button" onClick={() => setRoleFilter('')} aria-label="Clear role">×</button>
+                                    </span>
+                                )}
+                                {perPage !== 10 && (
+                                    <span className="filter-chip">{perPage} per page</span>
+                                )}
+                            </div>
+                        )}
+
+                        <div className="registered-users-table-wrap mb-0">
+                            <DataTable
+                                columns={columns}
+                                data={data}
+                                progressPending={loading && totalUsers > 0}
+                                progressComponent={<DataTableSkeleton rows={8} columns={8} />}
+                                pagination={false}
+                                customStyles={dataTableCustomStyles}
+                                striped
+                                highlightOnHover
+                                dense
+                                noDataComponent={
+                                    !loading ? (
+                                        <AdminEmptyState
+                                            icon="ri-group-line"
+                                            title="No registered users"
+                                            description={
+                                                token
+                                                    ? 'No users match your filters.'
+                                                    : 'Sign in as admin to load users.'
+                                            }
+                                        />
+                                    ) : null
                                 }
-                            }}
-                        />
+                            />
+                        </div>
 
-                        {/* Custom Pagination */}
-                        <Row className='mt-3'>
-                            <Col md={12} className='d-flex justify-content-between align-items-center'>
-                                <div>
-                                    <span className='text-muted'>
-                                        Showing {data.length > 0 ? ((currentPage - 1) * perPage) + 1 : 0} to {Math.min(currentPage * perPage, totalUsers)} of {totalUsers} users
-                                    </span>
-                                </div>
-                                <div className='d-flex gap-2'>
-                                    <Button
-                                        color="primary"
-                                        size="sm"
-                                        disabled={currentPage === 1}
-                                        onClick={() => setCurrentPage(1)}
-                                    >
-                                        First
-                                    </Button>
-                                    <Button
-                                        color="primary"
-                                        size="sm"
-                                        disabled={currentPage === 1}
-                                        onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
-                                    >
-                                        Previous
-                                    </Button>
-                                    <span className='d-flex align-items-center px-3'>
-                                        Page {currentPage} of {totalPages}
-                                    </span>
-                                    <Button
-                                        color="primary"
-                                        size="sm"
-                                        disabled={currentPage === totalPages}
-                                        onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
-                                    >
-                                        Next
-                                    </Button>
-                                    <Button
-                                        color="primary"
-                                        size="sm"
-                                        disabled={currentPage === totalPages}
-                                        onClick={() => setCurrentPage(totalPages)}
-                                    >
-                                        Last
-                                    </Button>
-                                </div>
-                            </Col>
-                        </Row>
+                        <div className="registered-users-footer d-flex flex-wrap align-items-center justify-content-between gap-3">
+                            <span className="text-muted small">
+                                Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{totalUsers}</strong> users
+                                {totalPages > 1 && (
+                                    <> · Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></>
+                                )}
+                            </span>
+                            {totalPages > 1 && (
+                                <Pagination className="mb-0 flex-wrap">
+                                    <Pagination.First disabled={currentPage <= 1 || loading} onClick={() => setCurrentPage(1)} />
+                                    <Pagination.Prev disabled={currentPage <= 1 || loading} onClick={() => setCurrentPage(p => Math.max(1, p - 1))} />
+                                    {paginationItems}
+                                    <Pagination.Next disabled={currentPage >= totalPages || loading} onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))} />
+                                    <Pagination.Last disabled={currentPage >= totalPages || loading} onClick={() => setCurrentPage(totalPages)} />
+                                </Pagination>
+                            )}
+                        </div>
                     </CardBody>
                 </Card>
+
+                <Modal isOpen={Boolean(viewUser)} toggle={() => setViewUser(null)} size="lg" centered>
+                    <ModalHeader toggle={() => setViewUser(null)}>
+                        User Details — {viewUser?.name || viewUser?.userName || 'User'}
+                    </ModalHeader>
+                    <ModalBody>
+                        {viewUser && <UserDetailsContent user={viewUser} />}
+                    </ModalBody>
+                </Modal>
+
                 <Footer />
             </div>
         </React.Fragment>
-    )
+    );
 }
-
 
 export default Registered;

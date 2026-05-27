@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo, useCallback } from 'react';
 import Header from '../../layouts/Header';
 import { Card, CardBody, CardTitle, Row, Col } from 'reactstrap';
 import { Button } from 'react-bootstrap';
@@ -6,10 +6,21 @@ import { getAllContacts, deleteContact } from '../../helper/contact_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import ConfirmModal from '../../components/ConfirmModal';
 import Footer from '../../layouts/Footer';
 import Loader from '../../layouts/Loader';
 import moment from 'moment';
+
+const CONTACT_READ_KEY = 'careveli_contact_read';
+
+function loadReadIds() {
+    try {
+        return new Set(JSON.parse(localStorage.getItem(CONTACT_READ_KEY) || '[]'));
+    } catch {
+        return new Set();
+    }
+}
 
 function Contact() {
     const user = useSelector(state => state.user);
@@ -21,58 +32,110 @@ function Contact() {
     const [confirm, setConfirm] = useState(false);
     const [selectedRows, setSelectedRows] = useState([]);
     const [toggleCleared, setToggleCleared] = useState(false);
+    const [readIds, setReadIds] = useState(loadReadIds);
 
-    // DataTable columns configuration
-    const columns = [
+    const toggleReadStatus = useCallback((contactId) => {
+        setReadIds(prev => {
+            const next = new Set(prev);
+            if (next.has(contactId)) next.delete(contactId);
+            else next.add(contactId);
+            localStorage.setItem(CONTACT_READ_KEY, JSON.stringify([...next]));
+            return next;
+        });
+    }, []);
+
+    const handleDeleteClick = useCallback((contact) => {
+        setCurrentContact(contact);
+        setConfirm(true);
+    }, []);
+
+    const columns = useMemo(() => [
         {
             name: 'Date',
-            selector: row => moment(row.createdAt).format('DD/MM/YYYY HH:mm'),
+            selector: row => moment(row.createdAt).format('DD MMM YYYY, hh:mm A'),
             sortable: true,
-            width: '150px'
+            width: '170px',
         },
         {
             name: 'Name',
             selector: row => row.name,
             sortable: true,
-            wrap: true,
-            width: '150px'
+            width: '140px',
         },
         {
             name: 'Email',
             selector: row => row.email,
             sortable: true,
-            wrap: true,
-            width: '200px'
+            width: '200px',
+            cell: row => (
+                <span className="text-truncate d-inline-block" style={{ maxWidth: '190px' }} title={row.email}>
+                    {row.email}
+                </span>
+            ),
+        },
+        {
+            name: 'Read',
+            width: '100px',
+            cell: row => {
+                const isRead = readIds.has(row._id);
+                return (
+                    <span className={`badge rounded-pill ${isRead ? 'bg-secondary' : 'bg-primary'}`}>
+                        {isRead ? 'Read' : 'Unread'}
+                    </span>
+                );
+            },
         },
         {
             name: 'Message',
             selector: row => row.msg,
-            sortable: true,
-            wrap: true,
+            grow: 2,
             cell: row => (
-                <div style={{ whiteSpace: 'normal', padding: '10px 0' }}>
+                <div className="text-truncate" style={{ maxWidth: '280px' }} title={row.msg}>
                     {row.msg}
                 </div>
-            )
+            ),
         },
         {
             name: 'Actions',
-            cell: (row) => (
-                <div>
+            cell: row => (
+                <div className="d-flex gap-1 flex-nowrap">
+                    <Button
+                        size="sm"
+                        variant="outline-primary"
+                        onClick={() => {
+                            toggleReadStatus(row._id);
+                            window.open(
+                                `mailto:${row.email}?subject=${encodeURIComponent('Re: Your message to Careveli')}`,
+                                '_blank'
+                            );
+                        }}
+                        title="Reply via email"
+                    >
+                        <i className="ri-reply-line me-1" />
+                        <span className="d-none d-lg-inline">Reply</span>
+                    </Button>
+                    <Button
+                        size="sm"
+                        variant="outline-secondary"
+                        onClick={() => toggleReadStatus(row._id)}
+                        title={readIds.has(row._id) ? 'Mark as unread' : 'Mark as read'}
+                    >
+                        <i className={readIds.has(row._id) ? 'ri-mail-open-line' : 'ri-mail-unread-line'} />
+                    </Button>
                     <Button
                         size="sm"
                         variant="danger"
                         onClick={() => handleDeleteClick(row)}
-                        title="Delete"
+                        title="Delete message"
                     >
-                        <i className="fa fa-trash"></i>
+                        <i className="ri-delete-bin-line" />
                     </Button>
                 </div>
             ),
             ignoreRowClick: true,
-            width: '100px'
-        }
-    ];
+            minWidth: '200px',
+        },
+    ], [readIds, toggleReadStatus, handleDeleteClick]);
 
     // Fetch all contacts on component mount
     useEffect(() => {
@@ -103,7 +166,6 @@ function Contact() {
             if (response.success) {
                 setContacts(response.contacts || []);
                 setFilteredContacts(response.contacts || []);
-                toast.success(`Loaded ${response.contacts?.length || 0} contact messages`);
             } else {
                 toast.error(response.message || 'Failed to fetch contacts');
                 setContacts([]);
@@ -117,12 +179,6 @@ function Contact() {
         } finally {
             setLoading(false);
         }
-    };
-
-    // Handle delete button click
-    const handleDeleteClick = (contact) => {
-        setCurrentContact(contact);
-        setConfirm(true);
     };
 
     // Delete contact
@@ -281,6 +337,8 @@ function Contact() {
 
                                 {/* Data Table */}
                                 <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                                     columns={columns}
                                     data={filteredContacts}
                                     pagination
@@ -319,8 +377,6 @@ function Contact() {
                 />
 
                 {/* Loading Overlay */}
-                {loading && <Loader />}
-
                 <Footer />
             </div>
         </React.Fragment>

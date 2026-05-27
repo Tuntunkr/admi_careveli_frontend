@@ -46,9 +46,44 @@ export const getRevenueAnalytics = (token, params = {}) => {
  * @returns {Promise} API response with users list and pagination
  */
 export const getAllUsers = (token, params = {}) => {
-    const queryParams = new URLSearchParams(params).toString();
-    const url = `user/all${queryParams ? `?${queryParams}` : ''}`;
-    console.log('getAllUsers - URL:', url);
-    console.log('getAllUsers - Query Params:', queryParams);
-    return get(url, { token });
+    if (!token) {
+        return Promise.resolve({
+            success: false,
+            message: 'Not Authorized - No Token Provided',
+        });
+    }
+    return get('user/all', { ...params, token });
+};
+
+/**
+ * Normalize GET /user/all response into { users, pagination, totalUsers }.
+ */
+export const parseAllUsersResponse = (res) => {
+    if (!res) {
+        return { users: [], pagination: null, totalUsers: 0, error: 'Empty response' };
+    }
+
+    if (res.success === false) {
+        return { users: [], pagination: null, totalUsers: 0, error: res.message };
+    }
+
+    let users = [];
+    if (Array.isArray(res?.data?.users)) {
+        users = res.data.users;
+    } else if (Array.isArray(res?.users)) {
+        users = res.users;
+    } else if (Array.isArray(res?.data)) {
+        users = res.data;
+    } else if (Array.isArray(res)) {
+        users = res;
+    }
+
+    const pagination = res?.data?.pagination || res?.pagination || null;
+    const totalUsers =
+        pagination?.totalUsers ??
+        res?.data?.totalUsers ??
+        res?.totalUsers ??
+        users.length;
+
+    return { users, pagination, totalUsers, error: null };
 };

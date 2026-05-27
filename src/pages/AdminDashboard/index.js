@@ -1,505 +1,702 @@
-import React, { useEffect, useState } from "react";
-import { Row, Col, Card, Table, Badge, ProgressBar, Form } from "react-bootstrap";
+import React, { useEffect, useState, useMemo } from "react";
+import { Row, Col, Card, Table, Badge, ProgressBar, Form, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import { useSelector } from "react-redux";
 import Footer from "../../layouts/Footer";
 import Header from "../../layouts/Header";
-import { toast } from 'react-toastify';
-import { getDashboardSummary, getChartAnalytics } from '../../helper/analytics_helper';
-import { useSelector } from "react-redux";
-import Loader from "../../layouts/Loader";
+// import { toast } from 'react-toastify';
+// import { getDashboardSummary, getChartAnalytics } from '../../helper/analytics_helper';
+// import { getAllOrders } from '../../helper/order_helper';
+import { formatCurrency as formatOrderCurrency, getStatusBadgeColor } from '../../helper/order_helper';
+import AnalyticsDashboardSkeleton from '../../components/AnalyticsDashboardSkeleton';
+import DashboardStatCard, {
+    mergeAdminOverviewIntoStats,
+    useAdminOverviewStats,
+} from '../../components/dashboard/DashboardStatCard';
+import {
+    buildDashboardMetrics,
+    TIME_FILTER_LABELS,
+    getMockDashboardPreview,
+} from '../../Utils/analyticsDashboard';
 import '../../assets/css/admin-dashboard.css';
 import {
-    LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+    LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
-import BlogEditor from "./Blog";
-import { CSSTransition, TransitionGroup } from 'react-transition-group';
+
+const PIE_COLORS = {
+    Paid: '#10B981',
+    Completed: '#10B981',
+    Pending: '#F59E0B',
+    Failed: '#EF4444',
+    Refunded: '#6B7280',
+    Delivered: '#10B981',
+    Shipped: '#3B82F6',
+    Processing: '#06B6D4',
+    Cancelled: '#EF4444',
+    Active: '#10B981',
+    Inactive: '#F59E0B',
+};
+
+const QUICK_ACTIONS = [
+    { label: 'Orders', icon: 'ri-shopping-cart-2-line', path: '/order', color: '#EA580C', bg: '#FFEDD5', countKey: 'totalOrders' },
+    { label: 'Products', icon: 'ri-shopping-bag-line', path: '/product', color: '#2563EB', bg: '#DBEAFE', countKey: 'totalProducts' },
+    { label: 'Customers', icon: 'ri-group-line', path: '/registered', color: '#9333EA', bg: '#F3E8FF', countKey: 'totalUsers' },
+    { label: 'Banners', icon: 'ri-image-2-line', path: '/banner', color: '#16A34A', bg: '#DCFCE7', countKey: 'totalBanners' },
+];
+
+const KPI_ACCENTS = ['#16A34A', '#EA580C', '#2563EB', '#9333EA', '#4F46E5', '#D97706', '#DC2626', '#0D9488'];
+
+const EmptyTableRow = ({ colSpan, message }) => (
+    <tr>
+        <td colSpan={colSpan} className="text-center text-secondary small py-4">
+            {message}
+        </td>
+    </tr>
+);
+
+const USE_MOCK_DATA = true; // Set false when API is ready
 
 export default function AdminDashboard() {
     const user = useSelector(state => state.user);
-    const currentSkin = (localStorage.getItem('skin-mode')) ? 'dark' : '';
+    const { overview, loading: overviewLoading, error: overviewError } = useAdminOverviewStats();
+    const adminName = user?.name || user?.user?.name || 'Admin';
+    const currentSkin = localStorage.getItem('skin-mode') ? 'dark' : '';
     const [skin, setSkin] = useState(currentSkin);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true);
+    const [showPreviewBanner, setShowPreviewBanner] = useState(
+        () => localStorage.getItem('dashboard-preview-dismissed') !== '1'
+    );
     const [stats, setStats] = useState(null);
     const [chartData, setChartData] = useState([]);
+    const [recentOrders, setRecentOrders] = useState([]);
     const [timeFilter, setTimeFilter] = useState('last30days');
     const [chartInterval, setChartInterval] = useState('monthly');
-    const [activeSection, setActiveSection] = useState('Statistics');
+    const [lastRefreshed, setLastRefreshed] = useState(null);
 
-    const switchSkin = (skin) => {
-        if (skin === 'dark') {
-            const btnWhite = document.getElementsByClassName('btn-white');
-            for (const btn of btnWhite) {
+    const switchSkin = (mode) => {
+        if (mode === 'dark') {
+            document.querySelectorAll('.btn-white').forEach(btn => {
                 btn.classList.add('btn-outline-primary');
                 btn.classList.remove('btn-white');
-            }
+            });
         } else {
-            const btnOutlinePrimary = document.getElementsByClassName('btn-outline-primary');
-            for (const btn of btnOutlinePrimary) {
+            document.querySelectorAll('.btn-outline-primary').forEach(btn => {
                 btn.classList.remove('btn-outline-primary');
                 btn.classList.add('btn-white');
-            }
+            });
         }
     };
-
-    switchSkin(skin);
 
     useEffect(() => {
         switchSkin(skin);
     }, [skin]);
 
-    const fetchAnalytics = async (filter = timeFilter, interval = chartInterval, silent = false) => {
+    /** Overlay GET /user/admin/stats `overview` on mock / analytics payload */
+    const displayStats = useMemo(
+        () => (overview ? mergeAdminOverviewIntoStats(stats || {}, overview) : stats),
+        [stats, overview]
+    );
+
+    const metrics = useMemo(() => buildDashboardMetrics(displayStats || {}), [displayStats]);
+
+    const orderStatusMax = useMemo(() => {
+        const list = displayStats?.orderStatus || [];
+        return Math.max(...list.map(item => item.count || 0), 1);
+    }, [displayStats]);
+
+    const hasChartValues = useMemo(
+        () => chartData.some(
+            item => Number(item.Revenue) > 0 || Number(item.Sales) > 0 || Number(item.Orders) > 0
+        ),
+        [chartData]
+    );
+
+    const formatCurrency = (amount) =>
+        new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+        }).format(amount || 0);
+
+    const formatDate = (dateString) => {
+        if (!dateString) return '—';
+        return new Date(dateString).toLocaleDateString('en-IN', {
+            month: 'short',
+            day: 'numeric',
+            hour: '2-digit',
+            minute: '2-digit',
+        });
+    };
+
+    const fetchAnalytics = async (_filter = timeFilter, interval = chartInterval, silent = false) => {
         if (!silent) setLoading(true);
+
         try {
-            const summaryData = await getDashboardSummary(filter);
-            const chartAnalytics = await getChartAnalytics(interval);
-
-            if (summaryData.success) {
-                setStats(summaryData.data);
+            if (USE_MOCK_DATA) {
+                await new Promise(resolve => setTimeout(resolve, 700));
+                const mock = getMockDashboardPreview(interval);
+                setStats(mock.stats);
+                setChartData(mock.chartData);
+                setRecentOrders(mock.recentOrders);
             } else {
-                if (!silent) toast.error(summaryData.message || "Failed to fetch summary stats");
+                // const token = user?.token || localStorage.getItem('adminToken');
+                // const [summaryData, chartAnalytics, ordersResponse] = await Promise.all([
+                //     getDashboardSummary(filter),
+                //     getChartAnalytics(interval),
+                //     token
+                //         ? getAllOrders(token, { page: 1, limit: 5, sortBy: 'date', order: 'desc' })
+                //         : Promise.resolve(null),
+                // ]);
+                // if (summaryData?.success) setStats(summaryData.data);
+                // if (chartAnalytics?.success) {
+                //     setChartData((chartAnalytics.data || []).map(item => ({
+                //         name: formatChartLabel(item._id),
+                //         Sales: item.totalSales || 0,
+                //         Revenue: item.totalRevenue || 0,
+                //         Orders: item.totalOrders || item.totalSales || 0,
+                //     })));
+                // }
+                // if (ordersResponse?.success) {
+                //     const orders = ordersResponse.orders || ordersResponse.data?.orders || [];
+                //     setRecentOrders(orders.slice(0, 5));
+                // }
             }
 
-            if (chartAnalytics.success) {
-                // Transform data for recharts
-                const formattedData = chartAnalytics.data.map(item => ({
-                    name: item._id, // Assume backend returns a label like "2023-08" or "Jan"
-                    Sales: item.totalSales,
-                    Revenue: item.totalRevenue
-                }));
-                setChartData(formattedData);
-            } else {
-                if (!silent) toast.error(chartAnalytics.message || "Failed to fetch chart analytics");
-            }
+            setLastRefreshed(new Date());
         } catch (error) {
-            console.error("Error fetching analytics:", error);
-            if (!silent) toast.error("Something went wrong!");
+            console.error('Error loading dashboard:', error);
         } finally {
             if (!silent) setLoading(false);
         }
     };
 
     useEffect(() => {
-        const token = user?.token || localStorage.getItem('adminToken');
-        if (token) {
-            fetchAnalytics();
-        }
+        fetchAnalytics();
     }, [timeFilter, chartInterval]);
 
-    // Auto-refresh stats every 60 seconds
-    useEffect(() => {
-        if (!user?.token && !localStorage.getItem('adminToken')) {
-            return;
-        }
+    // useEffect(() => {
+    //     const token = user?.token || localStorage.getItem('adminToken');
+    //     if (!token) return undefined;
+    //     const intervalId = setInterval(() => {
+    //         if (!loading) fetchAnalytics(timeFilter, chartInterval, true);
+    //     }, 60000);
+    //     return () => clearInterval(intervalId);
+    // }, [loading, timeFilter, chartInterval, user?.token]);
 
-        const intervalId = setInterval(() => {
-            if (!loading) {
-                fetchAnalytics(timeFilter, chartInterval, true); // Silent refresh
-            }
-        }, 60000); // 60 seconds
-
-        return () => clearInterval(intervalId);
-    }, [loading, timeFilter, chartInterval]);
-
-    const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('en-IN', {
-            style: 'currency',
-            currency: 'INR',
-            minimumFractionDigits: 0
-        }).format(amount || 0);
-    };
-
-    const formatDate = (dateString) => {
-        return new Date(dateString).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            hour: '2-digit',
-            minute: '2-digit'
-        });
-    };
-
-    const getStatusColor = (status) => {
-        const colors = {
-            'Pending': 'warning',
-            'Processing': 'info',
-            'Shipped': 'primary',
-            'Delivered': 'success',
-            'Cancelled': 'danger'
-        };
-        return colors[status] || 'secondary';
-    };
-
-    const getMonthName = (month) => {
-        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-        return months[month - 1] || month;
-    };
-
-    const PIE_COLORS = {
-        'Paid': '#10B981',
-        'Pending': '#F59E0B',
-        'Failed': '#EF4444',
-        'Delivered': '#10B981',
-        'Shipped': '#3B82F6',
-        'Active': '#10B981',
-        'Inactive': '#F59E0B',
-    };
+    const renderPieSection = (title, data, valueKey = 'count', labelKey = 'status', amountFormatter) => (
+        <Card className="border-0 shadow-sm h-100">
+            <Card.Body>
+                <h6 className="mb-4 fw-bold">{title}</h6>
+                {!data?.length ? (
+                    <p className="text-secondary small mb-0">No data for selected period</p>
+                ) : (
+                    <div className="d-flex align-items-center flex-wrap gap-3">
+                        <div className="dashboard-pie-wrap">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={data}
+                                        innerRadius={55}
+                                        outerRadius={75}
+                                        paddingAngle={4}
+                                        dataKey={valueKey}
+                                        nameKey={labelKey}
+                                    >
+                                        {data.map((entry, index) => (
+                                            <Cell
+                                                key={`cell-${index}`}
+                                                fill={PIE_COLORS[entry[labelKey]] || '#94A3B8'}
+                                            />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </div>
+                        <div className="flex-grow-1">
+                            {data.map((item, idx) => (
+                                <div key={idx} className="mb-3">
+                                    <div className="d-flex align-items-center gap-2 mb-1">
+                                        <div
+                                            className="dashboard-legend-dot"
+                                            style={{ backgroundColor: PIE_COLORS[item[labelKey]] || '#ccc' }}
+                                        />
+                                        <span className="small fw-medium">{item[labelKey]}</span>
+                                    </div>
+                                    <div className="text-secondary small">
+                                        {amountFormatter
+                                            ? amountFormatter(item)
+                                            : `${item[valueKey] || 0} records`}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                )}
+            </Card.Body>
+        </Card>
+    );
 
     return (
         <React.Fragment>
             <Header onSkin={setSkin} />
-            <div className="main main-app p-3 p-lg-4">
+            <div className="main main-app p-3 p-lg-4 analytics-dashboard">
+                {/* Header */}
+                {USE_MOCK_DATA && showPreviewBanner && (
+                    <div className="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center justify-content-between gap-2">
+                        <span className="d-flex align-items-center gap-2">
+                            <i className="ri-information-line"></i>
+                            Preview mode — showing sample data (API disabled for client demo).
+                        </span>
+                        <button
+                            type="button"
+                            className="btn-close btn-close-sm"
+                            aria-label="Dismiss"
+                            onClick={() => {
+                                localStorage.setItem('dashboard-preview-dismissed', '1');
+                                setShowPreviewBanner(false);
+                            }}
+                        />
+                    </div>
+                )}
+
                 <div className="d-md-flex align-items-center justify-content-between mb-4">
                     <div>
                         <h4 className="main-title mb-0">Analytics Dashboard</h4>
-                        <p className="text-secondary mb-0">Overview of your store performance and analytics</p>
+                        <p className="text-secondary mb-0">
+                            Welcome back, {adminName} · {TIME_FILTER_LABELS[timeFilter]}
+                            {lastRefreshed && (
+                                <span className="ms-2">
+                                    · Updated {formatDate(lastRefreshed)}
+                                </span>
+                            )}
+                        </p>
                     </div>
-                    <div className="d-flex gap-2 mt-3 mt-md-0">
+                    <div className="d-flex gap-2 mt-3 mt-md-0 flex-wrap">
                         <Form.Select
                             value={timeFilter}
                             onChange={(e) => setTimeFilter(e.target.value)}
                             className="bg-white"
-                            style={{ width: 'auto' }}
+                            style={{ width: 'auto', minWidth: '140px' }}
                         >
                             <option value="today">Today</option>
                             <option value="last7days">Last 7 Days</option>
                             <option value="last30days">Last 30 Days</option>
                             <option value="thisYear">This Year</option>
                         </Form.Select>
-                        <button
-                            className="btn btn-primary d-flex align-items-center gap-2"
+                        <Button
+                            variant="primary"
+                            className="d-flex align-items-center gap-2"
                             onClick={() => fetchAnalytics()}
                             disabled={loading}
                         >
-                            <i className="ri-download-2-line"></i>
-                            Export Report
-                        </button>
+                            <i className={`ri-refresh-line ${loading ? 'spin' : ''}`}></i>
+                            Refresh
+                        </Button>
                     </div>
                 </div>
 
-                {loading && <Loader />}
+                {overviewError && (
+                    <div className="alert alert-warning py-2 px-3 mb-3 small" role="status">
+                        <i className="ri-error-warning-line me-2" />
+                        Admin overview failed to load: {overviewError}. KPI counts for users, orders,
+                        and products may be incomplete until the API succeeds.
+                    </div>
+                )}
 
-                {stats && (
+                {(loading || (overviewLoading && !stats)) && <AnalyticsDashboardSkeleton />}
+
+                {!loading && stats && (
                     <>
-                        {/* Top Summary Cards */}
+                        {/* KPI Row — 8 standard metrics */}
                         <Row className="g-3 mb-4">
-                            <Col xs={12} sm={6} lg={3}>
-                                <Card className="border-0 shadow-sm">
-                                    <Card.Body>
-                                        <div className="d-flex align-items-center gap-3">
-                                            <div style={{ backgroundColor: '#F3E8FF', padding: '12px', borderRadius: '12px' }}>
-                                                <i className="ri-group-line" style={{ fontSize: '1.5rem', color: '#9333EA' }}></i>
-                                            </div>
-                                            <div>
-                                                <div className="text-secondary small mb-1">Total Users</div>
-                                                <h4 className="mb-0 fw-bold">{stats.summary?.totalUsers || 0}</h4>
-                                            </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Total Revenue"
+                                    value={formatCurrency(metrics.totalRevenue)}
+                                    icon="ri-coins-line"
+                                    iconBg="#DCFCE7"
+                                    iconColor="#16A34A"
+                                    accentColor={KPI_ACCENTS[0]}
+                                    subtext={
+                                        overviewLoading && !overview
+                                            ? 'Loading overview…'
+                                            : TIME_FILTER_LABELS[timeFilter]
+                                    }
+                                />
                             </Col>
-
-                            <Col xs={12} sm={6} lg={3}>
-                                <Card className="border-0 shadow-sm">
-                                    <Card.Body>
-                                        <div className="d-flex align-items-center gap-3">
-                                            <div style={{ backgroundColor: '#DBEAFE', padding: '12px', borderRadius: '12px' }}>
-                                                <i className="ri-shopping-bag-line" style={{ fontSize: '1.5rem', color: '#2563EB' }}></i>
-                                            </div>
-                                            <div>
-                                                <div className="text-secondary small mb-1">Total Products</div>
-                                                <h4 className="mb-0 fw-bold">{stats.summary?.totalProducts || 0}</h4>
-                                            </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Total Orders"
+                                    value={metrics.totalOrders}
+                                    icon="ri-shopping-cart-2-line"
+                                    iconBg="#FFEDD5"
+                                    iconColor="#EA580C"
+                                    accentColor={KPI_ACCENTS[1]}
+                                    subtext={`${metrics.pendingOrders} pending`}
+                                />
                             </Col>
-
-                            <Col xs={12} sm={6} lg={3}>
-                                <Card className="border-0 shadow-sm">
-                                    <Card.Body>
-                                        <div className="d-flex align-items-center gap-3">
-                                            <div style={{ backgroundColor: '#FFEDD5', padding: '12px', borderRadius: '12px' }}>
-                                                <i className="ri-shopping-cart-2-line" style={{ fontSize: '1.5rem', color: '#EA580C' }}></i>
-                                            </div>
-                                            <div>
-                                                <div className="text-secondary small mb-1">Total Orders</div>
-                                                <h4 className="mb-0 fw-bold">{stats.summary?.totalOrders || 0}</h4>
-                                            </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Avg. Order Value"
+                                    value={formatCurrency(metrics.averageOrderValue)}
+                                    icon="ri-line-chart-line"
+                                    iconBg="#DBEAFE"
+                                    iconColor="#2563EB"
+                                    accentColor={KPI_ACCENTS[2]}
+                                />
                             </Col>
-
-                            <Col xs={12} sm={6} lg={3}>
-                                <Card className="border-0 shadow-sm">
-                                    <Card.Body>
-                                        <div className="d-flex align-items-center gap-3">
-                                            <div style={{ backgroundColor: '#DCFCE7', padding: '12px', borderRadius: '12px' }}>
-                                                <i className="ri-money-rupee-circle-line" style={{ fontSize: '1.5rem', color: '#16A34A' }}></i>
-                                            </div>
-                                            <div>
-                                                <div className="text-secondary small mb-1">Total Revenue</div>
-                                                <h4 className="mb-0 fw-bold">{formatCurrency(stats.summary?.totalRevenue || 0)}</h4>
-                                            </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Total Customers"
+                                    value={metrics.totalUsers}
+                                    icon="ri-group-line"
+                                    iconBg="#F3E8FF"
+                                    iconColor="#9333EA"
+                                    accentColor={KPI_ACCENTS[3]}
+                                    subtext={`${metrics.activeUsers} active`}
+                                />
+                            </Col>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Total Products"
+                                    value={metrics.totalProducts}
+                                    icon="ri-shopping-bag-line"
+                                    iconBg="#E0E7FF"
+                                    iconColor="#4F46E5"
+                                    accentColor={KPI_ACCENTS[4]}
+                                    subtext={
+                                        metrics.activeProducts > 0
+                                            ? `${metrics.activeProducts} active listing${metrics.activeProducts === 1 ? '' : 's'}`
+                                            : undefined
+                                    }
+                                />
+                            </Col>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Pending Orders"
+                                    value={metrics.pendingOrders}
+                                    icon="ri-time-line"
+                                    iconBg="#FEF3C7"
+                                    iconColor="#D97706"
+                                    accentColor={KPI_ACCENTS[5]}
+                                />
+                            </Col>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Low Stock Alerts"
+                                    value={metrics.lowStockCount}
+                                    icon="ri-error-warning-line"
+                                    iconBg="#FEE2E2"
+                                    iconColor="#DC2626"
+                                    accentColor={KPI_ACCENTS[6]}
+                                />
+                            </Col>
+                            <Col xs={12} sm={6} xl={3}>
+                                <DashboardStatCard
+                                    label="Fulfillment Rate"
+                                    value={`${metrics.fulfillmentRate}%`}
+                                    icon="ri-truck-line"
+                                    iconBg="#CCFBF1"
+                                    iconColor="#0D9488"
+                                    accentColor={KPI_ACCENTS[7]}
+                                    subtext={`${metrics.deliveredOrders} delivered`}
+                                />
                             </Col>
                         </Row>
 
-                        {/* Mid Section: Charts */}
+                        {/* Quick actions */}
                         <Row className="g-3 mb-4">
-                            <Col xs={12} lg={4}>
+                            {QUICK_ACTIONS.map(action => (
+                                <Col xs={6} md={3} key={action.path}>
+                                    <Link to={action.path} className="text-decoration-none">
+                                        <Card className="border-0 shadow-sm dashboard-quick-action h-100">
+                                            <Card.Body className="d-flex align-items-center gap-3 py-3">
+                                                <div
+                                                    className="dashboard-quick-action__icon"
+                                                    style={{ backgroundColor: action.bg, color: action.color }}
+                                                >
+                                                    <i className={action.icon}></i>
+                                                </div>
+                                                <div className="flex-grow-1 min-w-0">
+                                                    <span className="fw-semibold text-dark d-block">{action.label}</span>
+                                                    <span className="badge rounded-pill mt-1" style={{ backgroundColor: action.bg, color: action.color }}>
+                                                        {metrics[action.countKey] ?? '—'}
+                                                    </span>
+                                                </div>
+                                                <i className="ri-arrow-right-s-line ms-auto text-secondary"></i>
+                                            </Card.Body>
+                                        </Card>
+                                    </Link>
+                                </Col>
+                            ))}
+                        </Row>
+
+                        {/* Charts — revenue trend + orders bar */}
+                        <Row className="g-3 mb-4">
+                            <Col xs={12}>
                                 <Card className="border-0 shadow-sm h-100">
                                     <Card.Body>
-                                        <div className="d-flex justify-content-between align-items-center mb-4">
-                                            <h6 className="mb-0 fw-bold">Sales & Revenue Overview</h6>
+                                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
+                                            <div>
+                                                <h6 className="mb-0 fw-bold">Revenue & Sales Trend</h6>
+                                                <p className="text-secondary small mb-0">Performance over time</p>
+                                            </div>
                                             <Form.Select
                                                 size="sm"
                                                 value={chartInterval}
                                                 onChange={(e) => setChartInterval(e.target.value)}
-                                                style={{ width: 'auto' }}
+                                                style={{ width: 'auto', minWidth: '120px' }}
                                             >
                                                 <option value="daily">Daily</option>
                                                 <option value="weekly">Weekly</option>
                                                 <option value="monthly">Monthly</option>
                                             </Form.Select>
                                         </div>
-                                        <div style={{ height: '250px' }}>
-                                            <ResponsiveContainer width="100%" height="100%">
-                                                <LineChart data={chartData} margin={{ top: 5, right: 20, bottom: 5, left: 0 }}>
-                                                    <Line type="monotone" dataKey="Sales" stroke="#8B5CF6" strokeWidth={2} />
-                                                    <Line type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2} />
-                                                    <CartesianGrid stroke="#ccc" strokeDasharray="5 5" vertical={false} />
-                                                    <XAxis dataKey="name" axisLine={false} tickLine={false} />
-                                                    <YAxis axisLine={false} tickLine={false} />
-                                                    <Tooltip />
-                                                    <Legend />
-                                                </LineChart>
-                                            </ResponsiveContainer>
+                                        <div className="dashboard-chart-xl position-relative">
+                                            {chartData.length && hasChartValues ? (
+                                                <ResponsiveContainer width="100%" height="100%">
+                                                    <LineChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
+                                                        <YAxis tick={{ fontSize: 11 }} />
+                                                        <Tooltip formatter={(v) => formatCurrency(v)} />
+                                                        <Legend />
+                                                        <Line type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2} dot={false} />
+                                                        <Line type="monotone" dataKey="Sales" stroke="#8B5CF6" strokeWidth={2} dot={false} />
+                                                    </LineChart>
+                                                </ResponsiveContainer>
+                                            ) : (
+                                                <div className="dashboard-chart-empty">
+                                                    <i className="ri-line-chart-line d-block mb-2" style={{ fontSize: '2rem' }} />
+                                                    No data available for this period
+                                                </div>
+                                            )}
                                         </div>
                                     </Card.Body>
                                 </Card>
                             </Col>
-
-                            <Col xs={12} lg={4}>
+                            <Col xs={12}>
                                 <Card className="border-0 shadow-sm h-100">
                                     <Card.Body>
-                                        <h6 className="mb-4 fw-bold">Payment Status</h6>
-                                        <div className="d-flex align-items-center">
-                                            <div style={{ height: '200px', width: '50%' }}>
+                                        <h6 className="mb-1 fw-bold">Orders Overview</h6>
+                                        <p className="text-secondary small mb-3">Volume by period</p>
+                                        <div className="dashboard-chart-lg position-relative">
+                                            {chartData.length && hasChartValues ? (
                                                 <ResponsiveContainer width="100%" height="100%">
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={stats.paymentStatus || []}
-                                                            innerRadius={60}
-                                                            outerRadius={80}
-                                                            paddingAngle={5}
-                                                            dataKey="count"
-                                                            nameKey="status"
-                                                        >
-                                                            {(stats.paymentStatus || []).map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[entry.status] || '#8884d8'} />
-                                                            ))}
-                                                        </Pie>
+                                                    <BarChart data={chartData}>
+                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
+                                                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
+                                                        <YAxis tick={{ fontSize: 10 }} />
                                                         <Tooltip />
-                                                    </PieChart>
+                                                        <Bar dataKey="Orders" fill="#3B82F6" radius={[4, 4, 0, 0]} />
+                                                    </BarChart>
                                                 </ResponsiveContainer>
-                                            </div>
-                                            <div className="w-50 ps-3">
-                                                {(stats.paymentStatus || []).map((item, idx) => (
-                                                    <div key={idx} className="mb-3">
-                                                        <div className="d-flex align-items-center gap-2 mb-1">
-                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: PIE_COLORS[item.status] || '#ccc' }}></div>
-                                                            <span className="small fw-medium">{item.status}</span>
-                                                        </div>
-                                                        <div className="text-secondary small">{formatCurrency(item.totalAmount)} ({item.count})</div>
-                                                    </div>
-                                                ))}
-                                            </div>
+                                            ) : (
+                                                <div className="dashboard-chart-empty">
+                                                    <i className="ri-bar-chart-line d-block mb-2" style={{ fontSize: '2rem' }} />
+                                                    No data available for this period
+                                                </div>
+                                            )}
                                         </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-
-                            <Col xs={12} lg={4}>
-                                <Card className="border-0 shadow-sm h-100">
-                                    <Card.Body>
-                                        <h6 className="mb-4 fw-bold">Order Status</h6>
-                                        <div className="d-flex align-items-center">
-                                            <div style={{ height: '200px', width: '50%' }}>
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <PieChart>
-                                                        <Pie
-                                                            data={stats.orderStatus || []}
-                                                            innerRadius={60}
-                                                            outerRadius={80}
-                                                            paddingAngle={5}
-                                                            dataKey="count"
-                                                            nameKey="status"
-                                                        >
-                                                            {(stats.orderStatus || []).map((entry, index) => (
-                                                                <Cell key={`cell-${index}`} fill={PIE_COLORS[entry.status] || '#8884d8'} />
-                                                            ))}
-                                                        </Pie>
-                                                        <Tooltip />
-                                                    </PieChart>
-                                                </ResponsiveContainer>
+                                        <div className="dashboard-insight-list mt-3">
+                                            <div className="d-flex justify-content-between small mb-2">
+                                                <span className="text-secondary">Payment success</span>
+                                                <strong>{metrics.paymentSuccessRate}%</strong>
                                             </div>
-                                            <div className="w-50 ps-3">
-                                                {(stats.orderStatus || []).map((item, idx) => (
-                                                    <div key={idx} className="mb-3">
-                                                        <div className="d-flex align-items-center gap-2 mb-1">
-                                                            <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: PIE_COLORS[item.status] || '#ccc' }}></div>
-                                                            <span className="small fw-medium">{item.status}</span>
-                                                        </div>
-                                                        <div className="text-secondary small">{item.count} orders</div>
-                                                    </div>
-                                                ))}
+                                            <ProgressBar now={metrics.paymentSuccessRate} variant="success" style={{ height: 6 }} />
+                                            <div className="d-flex justify-content-between small mt-3 mb-2">
+                                                <span className="text-secondary">Fulfillment rate</span>
+                                                <strong>{metrics.fulfillmentRate}%</strong>
                                             </div>
+                                            <ProgressBar now={metrics.fulfillmentRate} variant="info" style={{ height: 6 }} />
                                         </div>
                                     </Card.Body>
                                 </Card>
                             </Col>
                         </Row>
 
-                        {/* Bottom Section: Tables */}
+                        {/* Order status breakdown + pies */}
                         <Row className="g-3 mb-4">
+                            <Col xs={12} lg={4}>
+                                <Card className="border-0 shadow-sm h-100">
+                                    <Card.Body>
+                                        <h6 className="mb-4 fw-bold">Order Pipeline</h6>
+                                        {(displayStats.orderStatus || []).length ? (
+                                            (displayStats.orderStatus || []).map((item, idx) => (
+                                                <div key={idx} className="mb-3">
+                                                    <div className="d-flex justify-content-between small mb-1">
+                                                        <span>{item.status}</span>
+                                                        <span className="fw-semibold">{item.count}</span>
+                                                    </div>
+                                                    <ProgressBar
+                                                        now={((item.count || 0) / orderStatusMax) * 100}
+                                                        variant={getStatusBadgeColor(item.status)}
+                                                        style={{ height: 8 }}
+                                                    />
+                                                </div>
+                                            ))
+                                        ) : (
+                                            <p className="text-secondary small mb-0">No order status data</p>
+                                        )}
+                                    </Card.Body>
+                                </Card>
+                            </Col>
+                            <Col xs={12} lg={4}>
+                                {renderPieSection(
+                                    'Payment Status',
+                                    displayStats.paymentStatus,
+                                    'count',
+                                    'status',
+                                    (item) => `${formatCurrency(item.totalAmount)} (${item.count})`
+                                )}
+                            </Col>
+                            <Col xs={12} lg={4}>
+                                {renderPieSection(
+                                    'User Activity',
+                                    displayStats.userActivity
+                                        ? [
+                                              { status: 'Active', count: displayStats.userActivity.active },
+                                              { status: 'Inactive', count: displayStats.userActivity.inactive },
+                                          ]
+                                        : [],
+                                    'count',
+                                    'status',
+                                    (item) => `${item.count} users`
+                                )}
+                            </Col>
+                        </Row>
+
+                        {/* Tables — recent orders, top products, low stock */}
+                        <Row className="g-3 mb-4">
+                            <Col xs={12} lg={5}>
+                                <Card className="border-0 shadow-sm h-100">
+                                    <Card.Body>
+                                        <div className="d-flex justify-content-between align-items-center mb-3">
+                                            <h6 className="mb-0 fw-bold">Recent Orders</h6>
+                                            <Link to="/order" className="text-primary text-decoration-none small">View all</Link>
+                                        </div>
+                                        <div className="table-responsive">
+                                            <Table borderless size="sm" className="mb-0">
+                                                <thead className="text-secondary small">
+                                                    <tr>
+                                                        <th>Order #</th>
+                                                        <th>Customer</th>
+                                                        <th>Amount</th>
+                                                        <th>Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {recentOrders.length ? (
+                                                        recentOrders.map(order => (
+                                                            <tr key={order._id}>
+                                                                <td className="small fw-medium">{order.orderNumber}</td>
+                                                                <td className="small text-truncate" style={{ maxWidth: 120 }}>
+                                                                    {order.shippingAddress?.firstName}{' '}
+                                                                    {order.shippingAddress?.lastName}
+                                                                </td>
+                                                                <td className="small">
+                                                                    {formatOrderCurrency(order.total || order.amount)}
+                                                                </td>
+                                                                <td>
+                                                                    <Badge bg={getStatusBadgeColor(order.status)} className="small">
+                                                                        {order.status}
+                                                                    </Badge>
+                                                                </td>
+                                                            </tr>
+                                                        ))
+                                                    ) : (
+                                                        <EmptyTableRow colSpan={4} message="No recent orders" />
+                                                    )}
+                                                </tbody>
+                                            </Table>
+                                        </div>
+                                    </Card.Body>
+                                </Card>
+                            </Col>
                             <Col xs={12} lg={4}>
                                 <Card className="border-0 shadow-sm h-100">
                                     <Card.Body>
                                         <div className="d-flex justify-content-between align-items-center mb-3">
                                             <h6 className="mb-0 fw-bold">Top Selling Products</h6>
-                                            <Link to="#" className="text-primary text-decoration-none small">View All</Link>
+                                            <Link to="/product" className="text-primary text-decoration-none small">View all</Link>
                                         </div>
-                                        <Table borderless size="sm">
+                                        <Table borderless size="sm" className="mb-0">
                                             <thead className="text-secondary small">
                                                 <tr>
+                                                    <th>#</th>
                                                     <th>Product</th>
                                                     <th className="text-end">Sold</th>
                                                     <th className="text-end">Revenue</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {(stats.topProducts || []).map((product, idx) => (
-                                                    <tr key={idx}>
-                                                        <td className="small">{product.name}</td>
-                                                        <td className="text-end small">{product.totalQuantitySold}</td>
-                                                        <td className="text-end small">{formatCurrency(product.totalRevenue)}</td>
-                                                    </tr>
-                                                ))}
+                                                {(displayStats.topProducts || []).length ? (
+                                                    displayStats.topProducts.map((product, idx) => (
+                                                        <tr key={idx}>
+                                                            <td className="small text-secondary">{idx + 1}</td>
+                                                            <td className="small">{product.name}</td>
+                                                            <td className="text-end small">{product.totalQuantitySold}</td>
+                                                            <td className="text-end small">{formatCurrency(product.totalRevenue)}</td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <EmptyTableRow colSpan={4} message="No product sales data" />
+                                                )}
                                             </tbody>
                                         </Table>
                                     </Card.Body>
                                 </Card>
                             </Col>
-
-                            <Col xs={12} lg={4}>
+                            <Col xs={12} lg={3}>
                                 <Card className="border-0 shadow-sm h-100">
                                     <Card.Body>
                                         <div className="d-flex justify-content-between align-items-center mb-3">
-                                            <h6 className="mb-0 fw-bold">Low Stock Alerts</h6>
-                                            <Link to="#" className="text-primary text-decoration-none small">View All</Link>
+                                            <h6 className="mb-0 fw-bold">Low Stock</h6>
+                                            <Link to="/product" className="text-primary text-decoration-none small">View all</Link>
                                         </div>
-                                        <Table borderless size="sm">
+                                        <Table borderless size="sm" className="mb-0">
                                             <thead className="text-secondary small">
                                                 <tr>
                                                     <th>Product</th>
                                                     <th className="text-center">Stock</th>
-                                                    <th className="text-end">Price</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {(stats.lowStockAlerts || []).map((product, idx) => (
-                                                    <tr key={idx}>
-                                                        <td className="small">{product.name}</td>
-                                                        <td className="text-center small text-danger">{product.stock}</td>
-                                                        <td className="text-end small">{formatCurrency(product.price)}</td>
-                                                    </tr>
-                                                ))}
+                                                {(displayStats.lowStockAlerts || []).length ? (
+                                                    displayStats.lowStockAlerts.map((product, idx) => (
+                                                        <tr key={idx}>
+                                                            <td className="small">{product.name}</td>
+                                                            <td className="text-center">
+                                                                <Badge bg="danger" className="small">{product.stock}</Badge>
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <EmptyTableRow colSpan={2} message="All products in stock" />
+                                                )}
                                             </tbody>
                                         </Table>
                                     </Card.Body>
                                 </Card>
                             </Col>
-
-                            <Col xs={12} lg={4}>
-                                <Card className="border-0 shadow-sm h-100">
-                                    <Card.Body>
-                                        <h6 className="mb-4 fw-bold">User Activity</h6>
-                                        <div className="d-flex align-items-center">
-                                            <div style={{ height: '200px', width: '50%' }}>
-                                                {stats.userActivity && (
-                                                    <ResponsiveContainer width="100%" height="100%">
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={[
-                                                                    { name: 'Active', value: stats.userActivity.active },
-                                                                    { name: 'Inactive', value: stats.userActivity.inactive }
-                                                                ]}
-                                                                innerRadius={60}
-                                                                outerRadius={80}
-                                                                paddingAngle={5}
-                                                                dataKey="value"
-                                                            >
-                                                                <Cell fill={PIE_COLORS['Active']} />
-                                                                <Cell fill={PIE_COLORS['Inactive']} />
-                                                            </Pie>
-                                                            <Tooltip />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
-                                                )}
-                                            </div>
-                                            <div className="w-50 ps-3">
-                                                <div className="mb-3">
-                                                    <div className="d-flex align-items-center gap-2 mb-1">
-                                                        <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: PIE_COLORS['Active'] }}></div>
-                                                        <span className="small fw-medium">Active Users</span>
-                                                    </div>
-                                                    <div className="text-secondary small">{stats.userActivity?.active || 0}</div>
-                                                </div>
-                                                <div className="mb-3">
-                                                    <div className="d-flex align-items-center gap-2 mb-1">
-                                                        <div style={{ width: 8, height: 8, borderRadius: '50%', backgroundColor: PIE_COLORS['Inactive'] }}></div>
-                                                        <span className="small fw-medium">Inactive Users</span>
-                                                    </div>
-                                                    <div className="text-secondary small">{stats.userActivity?.inactive || 0}</div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
                         </Row>
-
                     </>
                 )}
 
                 {!loading && !stats && (
-                    <Card className="card-one">
+                    <Card className="border-0 shadow-sm">
                         <Card.Body className="text-center py-5">
-                            <i className="ri-error-warning-line" style={{ fontSize: '4rem', color: '#9CA3AF' }}></i>
+                            <i className="ri-error-warning-line dashboard-empty-icon"></i>
                             <h5 className="mt-3 text-secondary">No data available</h5>
-                            <p className="text-secondary">Unable to load admin statistics</p>
-                            <button className="btn btn-primary mt-2" onClick={() => fetchAnalytics()}>
+                            <p className="text-secondary">Unable to load analytics. Check API connection.</p>
+                            <Button variant="primary" className="mt-2" onClick={() => fetchAnalytics()}>
                                 Try Again
-                            </button>
+                            </Button>
                         </Card.Body>
                     </Card>
                 )}
-
-                <TransitionGroup>
-                    {/* <CSSTransition key={'RecommendedEditor'} classNames="fade" timeout={300}>
-          <div style={{ display: activeSection === 'Recommended Editor' ? 'block' : 'none' }}>
-            <RecommendedEditor />
-          </div>
-        </CSSTransition> */}
-                    <CSSTransition key={'BlogEditor'} classNames="fade" timeout={300}>
-                        <div style={{ display: activeSection === 'Blog Editor' ? 'block' : 'none' }}>
-                            <BlogEditor />
-                        </div>
-                    </CSSTransition>
-                </TransitionGroup>
 
                 <Footer />
             </div>

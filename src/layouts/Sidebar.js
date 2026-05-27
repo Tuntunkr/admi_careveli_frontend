@@ -233,11 +233,11 @@ class SidebarMenu extends Component {
                     </ul>
                 </div>
 
-                <div className="nav-label">Marketing</div>
+                <div className="nav-label nav-label--static">MARKETING</div>
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
-                            <NavLink to="/marketing-links" className="nav-link"><i className={"ri-links-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>Marketing Links</span></NavLink>
+                            <NavLink to="/marketing-links" className="nav-link"><i className={"ri-links-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>MARKETING LINKS</span></NavLink>
                         </li>
                     </ul>
                 </div>
@@ -245,7 +245,7 @@ class SidebarMenu extends Component {
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
-                            <NavLink to="/payment-history" className="nav-link"><i className={"ri-money-dollar-circle-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>Payment History</span></NavLink>
+                            <NavLink to="/payment-history" className="nav-link"><i className={"ri-money-dollar-circle-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>PAYMENT HISTORY</span></NavLink>
                         </li>
                     </ul>
                 </div>

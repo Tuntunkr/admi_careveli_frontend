@@ -1,16 +1,20 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useMemo } from 'react'
+import { Link } from 'react-router-dom';
 import Header from '../../layouts/Header'
-import { Card, CardBody, CardTitle, Row, Col, Modal, ModalBody, Label } from 'reactstrap'
+import { Card, CardBody, CardTitle, Row, Col, Modal, ModalBody, Label, Input } from 'reactstrap'
 import { Button } from 'react-bootstrap';
 import { AvForm, AvField } from "availity-reactstrap-validation";
 import { del, get, post, put } from '../../helper/api_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import ConfirmModal from '../../components/ConfirmModal';
 import Cropper from "react-cropper";
 import "cropperjs/dist/cropper.css";
 import Footer from '../../layouts/Footer';
+import AdminAddButton from '../../components/admin/AdminAddButton';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 import * as Utils from "../../Utils";
 import Loader from '../../layouts/Loader';
 import moment from 'moment';
@@ -28,6 +32,15 @@ function CategoryManagement() {
     const [columns, setColumns] = useState([]);
     const [currentData, setCurrentData] = useState(null);
     const [confirm, setConfirm] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const filteredData = useMemo(() => {
+        if (!searchTerm.trim()) return data;
+        const q = searchTerm.trim().toLowerCase();
+        return data.filter(item =>
+            String(item?.title || item?.name || '').toLowerCase().includes(q)
+        );
+    }, [data, searchTerm]);
 
     useEffect(() => {
         if (token) {
@@ -265,45 +278,42 @@ function CategoryManagement() {
                 onCloseClick={() => setConfirm(false)}
                 data={currentData}
             />
-            {loading && <Loader />}
-
             <div className="main main-app p-3 p-lg-4">
+                <div className="main-page-header d-md-flex align-items-center justify-content-between mb-3">
+                    <div>
+                        <ol className="breadcrumb fs-sm mb-1">
+                            <li className="breadcrumb-item"><Link to="/admin/dashboard">Dashboard</Link></li>
+                            <li className="breadcrumb-item active" aria-current="page">Category Management</li>
+                        </ol>
+                        <h4 className="main-title mb-0 admin-page-title">Category Management</h4>
+                    </div>
+                    <AdminAddButton label="Add Category" onClick={() => { setCurrentData(null); setIsAdd(true) }} />
+                </div>
                 <Card>
-                    <Row className='mb-4'>
-                        <Col md={11}>
-                            <CardBody>
-                                <CardTitle><b>Category Management</b></CardTitle>
-                            </CardBody>
-                        </Col>
-                        <Col md={1}>
-                            <div className='action-btn' style={{ marginTop: '20px' }}>
-                                <button
-                                    type="button"
-                                    style={{ border: 'none', backgroundColor: Utils.themeColor }}
-                                    className="btn btn-dark"
-                                    onClick={() => { setCurrentData(null); setIsAdd(true) }}
-                                >
-                                    <i className={'ri-add-fill'} />
-                                </button>
-                            </div>
-                        </Col>
-                    </Row>
+                    <CardBody className="pb-0">
+                        <div className="admin-search-wrap mb-3" style={{ maxWidth: '360px' }}>
+                            <i className="ri-search-line admin-search-icon" />
+                            <Input
+                                type="search"
+                                className="form-control"
+                                placeholder="Search categories…"
+                                value={searchTerm}
+                                onChange={e => setSearchTerm(e.target.value)}
+                            />
+                        </div>
+                    </CardBody>
                     <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                         columns={columns}
-                        data={data}
+                        data={filteredData}
                         pagination
                         paginationPerPage={10}
                         paginationRowsPerPageOptions={[10, 20, 30, 50]}
-                        customStyles={{
-                            headCells: {
-                                style: {
-                                    color: 'black',
-                                    fontWeight: 'bold',
-                                    fontSize: 15,
-                                    width: 0
-                                },
-                            },
-                        }}
+                        paginationComponentOptions={dataTablePaginationOptions}
+                        customStyles={dataTableCustomStyles}
+                        striped
+                        highlightOnHover
                     />
                 </Card>
                 <Footer />

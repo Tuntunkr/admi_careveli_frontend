@@ -6,11 +6,15 @@ import { getAllBlogsAdmin, addBlog, updateBlog, deleteBlog, toggleBlogStatus } f
 import ConfirmModal from '../../components/ConfirmModal';
 import Header from '../../layouts/Header';
 import Footer from '../../layouts/Footer';
+import * as Utils from '../../Utils';
+import AdminAddButton from '../../components/admin/AdminAddButton';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
+import { Link } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import moment from 'moment';
-import * as Utils from '../../Utils';
 import Loader from '../../layouts/Loader';
 
 const BlogEditor = () => {
@@ -77,21 +81,43 @@ const BlogEditor = () => {
                 maxWidth: '120px'
             },
             {
-                cell: (row) => <>
-                    <Button onClick={() => handleShowModal(row)}
-                        title={"Edit"} variant="primary"
-                        style={{ marginRight: 10, padding: 5, paddingLeft: 8, paddingRight: 8, border: 'none' }}>
-                        <span className="ri-edit-fill" style={{ fontSize: 15 }}></span>
-                    </Button>
-                    <Button onClick={() => handleDelete(row._id)}
-                        title={"Delete"} variant="danger"
-                        style={{ marginRight: 10, padding: 5, paddingLeft: 8, paddingRight: 8, border: 'none' }}>
-                        <span className="ri-delete-bin-6-line" style={{ fontSize: 15 }}></span>
-                    </Button>
-                </>,
-                name: 'Action',
+                cell: (row) => (
+                    <div className="d-flex gap-1">
+                        <Button
+                            onClick={() => {
+                                const slug = row?.slug || row?._id;
+                                window.open(`${Utils.STORE_FRONT_URL}/blog/${slug}`, '_blank', 'noopener,noreferrer');
+                            }}
+                            title="Preview on store"
+                            variant="outline-primary"
+                            size="sm"
+                            style={{ padding: '4px 8px', border: 'none' }}
+                        >
+                            <i className="ri-eye-line" />
+                        </Button>
+                        <Button
+                            onClick={() => handleShowModal(row)}
+                            title="Edit"
+                            variant="primary"
+                            size="sm"
+                            style={{ padding: '4px 8px', border: 'none' }}
+                        >
+                            <i className="ri-edit-fill" />
+                        </Button>
+                        <Button
+                            onClick={() => handleDelete(row._id)}
+                            title="Delete"
+                            variant="danger"
+                            size="sm"
+                            style={{ padding: '4px 8px', border: 'none' }}
+                        >
+                            <i className="ri-delete-bin-6-line" />
+                        </Button>
+                    </div>
+                ),
+                name: 'Actions',
                 ignoreRowClick: true,
-                maxWidth: '130px'
+                minWidth: '140px',
             },
         ]);
     }, [blogs]);
@@ -267,8 +293,6 @@ const BlogEditor = () => {
                 onConfirm={onConfirm}
                 data={currentBlog}
             />
-            {loading && <Loader />}
-
             <div className="main main-app p-3 p-lg-4">
                 {showModal ? (
                     <div className="admin-blog-editor">
@@ -355,51 +379,31 @@ const BlogEditor = () => {
                     </div>
                 ) : (
                     <Card>
-                        <Row className='mb-4'>
-                            <Col md={11}>
-                                <Card.Body>
-                                    <Card.Title><b>Blog Management</b></Card.Title>
-                                </Card.Body>
-                            </Col>
-                            <Col md={1}>
-                                <div className='action-btn' style={{ padding: '20px' }}>
-                                    <button
-                                        type="button"
-                                        style={{ border: 'none', backgroundColor: Utils.themeColor }}
-                                        className="btn btn-dark"
-                                        onClick={() => handleShowModal()}
-                                    >
-                                        <i className={'ri-add-fill'} />
-                                    </button>
-                                </div>
-                            </Col>
-                        </Row>
+                        <div className="main-page-header d-md-flex align-items-center justify-content-between p-3 pb-0">
+                            <div>
+                                <ol className="breadcrumb fs-sm mb-1">
+                                    <li className="breadcrumb-item"><Link to="/admin/dashboard">Dashboard</Link></li>
+                                    <li className="breadcrumb-item active" aria-current="page">Blog Management</li>
+                                </ol>
+                                <h4 className="main-title mb-0 admin-page-title">Blog Management</h4>
+                            </div>
+                            <AdminAddButton label="Create Blog" onClick={() => handleShowModal()} />
+                        </div>
                         <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                             columns={columns}
                             data={blogs}
                             pagination
                             highlightOnHover
                             striped
+                            paginationComponentOptions={dataTablePaginationOptions}
+                            customStyles={dataTableCustomStyles}
                             noDataComponent={
                                 <div className="text-center py-4 text-muted">No blogs found.</div>
                             }
                             paginationPerPage={10}
                             paginationRowsPerPageOptions={[10, 20, 30, 50]}
-                            customStyles={{
-                                headCells: {
-                                    style: {
-                                        color: 'black',
-                                        fontWeight: 'bold',
-                                        fontSize: 15,
-                                        width: 0
-                                    },
-                                },
-                                cells: {
-                                    style: {
-                                        width: 0
-                                    }
-                                }
-                            }}
                         />
                     </Card>
                 )}

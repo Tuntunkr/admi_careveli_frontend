@@ -4,6 +4,7 @@ import { Button, Form } from 'react-bootstrap';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import Header from '../../layouts/Header';
 import Footer from '../../layouts/Footer';
 import Loader from '../../layouts/Loader';
@@ -18,6 +19,8 @@ import {
     downloadCSV
 } from '../../helper/testimonial_helper';
 import * as Utils from '../../Utils';
+import StarRating from '../../components/admin/StarRating';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 
 function Testimonial() {
     const user = useSelector(state => state.user);
@@ -98,11 +101,7 @@ function Testimonial() {
             name: 'Rating',
             selector: row => row.rating,
             sortable: true,
-            cell: row => (
-                <div className="text-warning">
-                    {'⭐'.repeat(row.rating)}
-                </div>
-            ),
+            cell: row => <StarRating value={row.rating} />,
             width: '140px'
         },
         {
@@ -116,12 +115,13 @@ function Testimonial() {
             name: 'Review',
             selector: row => row.review,
             cell: row => (
-                <div style={{ whiteSpace: 'normal', padding: '8px 0' }}>
-                    {row.review?.length > 100 ? `${row.review.substring(0, 100)}...` : row.review}
+                <div className="text-truncate" style={{ maxWidth: '280px' }} title={row.review}>
+                    {row.review?.length > 80 ? `${row.review.substring(0, 80)}…` : row.review}
                 </div>
             ),
-            wrap: true,
-            grow: 2
+            grow: 2,
+            minWidth: '200px',
+            maxWidth: '300px',
         },
         {
             name: 'Status',
@@ -225,17 +225,14 @@ function Testimonial() {
                 // Standard success response with data array
                 setTestimonials(res.data || []);
                 setFilteredTestimonials(res.data || []);
-                toast.success(`Loaded ${res.totalTestimonials || res.data.length || 0} testimonials`);
             } else if (res?.testimonials) {
                 // Alternative: data in testimonials field
                 setTestimonials(res.testimonials || []);
                 setFilteredTestimonials(res.testimonials || []);
-                toast.success(`Loaded ${res.testimonials.length} testimonials`);
             } else if (Array.isArray(res)) {
                 // Alternative: direct array response
                 setTestimonials(res);
                 setFilteredTestimonials(res);
-                toast.success(`Loaded ${res.length} testimonials`);
             } else {
                 // Error or unexpected format
                 console.error('Unexpected response format:', res);
@@ -489,11 +486,15 @@ function Testimonial() {
                                 </div>
 
                                 <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                                     columns={columns}
                                     data={filteredTestimonials}
                                     pagination
                                     paginationPerPage={10}
                                     paginationRowsPerPageOptions={[10, 20, 30, 50]}
+                                    paginationComponentOptions={dataTablePaginationOptions}
+                                    customStyles={dataTableCustomStyles}
                                     highlightOnHover
                                     responsive
                                     striped

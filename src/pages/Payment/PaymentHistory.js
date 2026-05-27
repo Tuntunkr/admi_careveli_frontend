@@ -2,8 +2,10 @@ import React, { useEffect, useState } from "react";
 import Header from "../../layouts/Header";
 import { fetchPaymentHistory } from "../../helper/payment_helper";
 import moment from "moment";
-import { Table, Pagination, Badge, Card, Spinner } from "react-bootstrap";
+import { Table, Pagination, Badge, Card, Form, Button } from "react-bootstrap";
 import { Link } from "react-router-dom";
+import AdminEmptyState from "../../components/admin/AdminEmptyState";
+import DataTableSkeleton from "../../components/DataTableSkeleton";
 
 export default function PaymentHistory() {
     const [data, setData] = useState([]);
@@ -12,6 +14,7 @@ export default function PaymentHistory() {
     const [limit, setLimit] = useState(10);
     const [totalPages, setTotalPages] = useState(1);
     const [status, setStatus] = useState("");
+    const [searchTx, setSearchTx] = useState("");
 
     const fetchData = async () => {
         setLoading(true);
@@ -62,22 +65,26 @@ export default function PaymentHistory() {
 
                 <Card>
                     <Card.Body>
-                        <div className="d-flex justify-content-between mb-3">
-                            <div className="d-flex align-items-center">
-                                <select className="form-select w-auto" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
-                                    <option value="">All Statuses</option>
-                                    <option value="success">Success</option>
-                                    <option value="pending">Pending</option>
-                                    <option value="failed">Failed</option>
-                                    <option value="refunded">Refunded</option>
-                                </select>
-                            </div>
+                        <div className="d-flex flex-wrap gap-2 justify-content-between mb-3">
+                            <Form.Select className="w-auto" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1); }}>
+                                <option value="">All Statuses</option>
+                                <option value="success">Success</option>
+                                <option value="pending">Pending</option>
+                                <option value="failed">Failed</option>
+                                <option value="refunded">Refunded</option>
+                            </Form.Select>
+                            <Form.Control
+                                type="search"
+                                className="w-auto"
+                                style={{ minWidth: '220px' }}
+                                placeholder="Search transaction ID…"
+                                value={searchTx}
+                                onChange={(e) => { setSearchTx(e.target.value); setPage(1); }}
+                            />
                         </div>
 
                         {loading ? (
-                            <div className="text-center py-5">
-                                <Spinner animation="border" variant="primary" />
-                            </div>
+                            <DataTableSkeleton rows={6} columns={8} />
                         ) : (
                             <div className="table-responsive">
                                 <Table className="table-hover mb-0">
@@ -94,8 +101,12 @@ export default function PaymentHistory() {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {data.length > 0 ? (
-                                            data.map((item, index) => (
+                                        {(searchTx ? data.filter(item =>
+                                            String(item.transactionId || '').toLowerCase().includes(searchTx.toLowerCase())
+                                        ) : data).length > 0 ? (
+                                            (searchTx ? data.filter(item =>
+                                                String(item.transactionId || '').toLowerCase().includes(searchTx.toLowerCase())
+                                            ) : data).map((item, index) => (
                                                 <tr key={item._id || index}>
                                                     <td>{(page - 1) * limit + index + 1}</td>
                                                     <td>{item.transactionId || "-"}</td>
@@ -118,8 +129,12 @@ export default function PaymentHistory() {
                                             ))
                                         ) : (
                                             <tr>
-                                                <td colSpan="8" className="text-center text-muted py-4">
-                                                    No payment history found
+                                                <td colSpan="8" className="p-0 border-0">
+                                                    <AdminEmptyState
+                                                        icon="ri-money-dollar-circle-line"
+                                                        title="No payment history found"
+                                                        description="Payments will appear here once customers complete checkout."
+                                                    />
                                                 </td>
                                             </tr>
                                         )}

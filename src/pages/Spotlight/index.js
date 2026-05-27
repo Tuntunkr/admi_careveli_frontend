@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useCallback, useRef } from 'react'
 import Header from '../../layouts/Header'
 import { Card, CardBody, CardTitle, Row, Col, Modal, ModalBody, Label } from 'reactstrap'
 import { Button } from 'react-bootstrap';
@@ -7,8 +7,11 @@ import { del, get, post, put } from '../../helper/api_helper';
 import { useSelector } from 'react-redux';
 import { toast } from 'react-toastify';
 import DataTable from 'react-data-table-component';
+import DataTableSkeleton from '../../components/DataTableSkeleton';
 import ConfirmModal from '../../components/ConfirmModal';
 import Footer from '../../layouts/Footer';
+import AdminEmptyState from '../../components/admin/AdminEmptyState';
+import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
 import * as Utils from "../../Utils";
 import Loader from '../../layouts/Loader';
 import moment from 'moment';
@@ -28,14 +31,54 @@ function SpotlightManagement() {
     const [confirm, setConfirm] = useState(false);
     const [file, setFile] = useState(null);
     const [video, setVideo] = useState(null);
+    const loadRequestRef = useRef(0);
+    const authErrorShownRef = useRef(false);
+
+    const fetchSpotlights = useCallback(() => {
+        if (!token) return;
+
+        const requestId = ++loadRequestRef.current;
+        setLoading(true);
+
+        get("spotlight/admin/list", { token })
+            .then(res => {
+                if (requestId !== loadRequestRef.current) return;
+                setLoading(false);
+
+                const ok = res?.statusCode === 200 || res?.success === true;
+                if (ok) {
+                    const list = Array.isArray(res?.data)
+                        ? res.data
+                        : Array.isArray(res?.spotlights)
+                            ? res.spotlights
+                            : [];
+                    setData(list);
+                    return;
+                }
+
+                toast.error(res?.message || res?.error || "Failed to fetch spotlights");
+            })
+            .catch(err => {
+                if (requestId !== loadRequestRef.current) return;
+                setLoading(false);
+                console.error("Error fetching spotlights:", err);
+                toast.error("Failed to load spotlights. Check console for details.");
+            });
+    }, [token]);
 
     useEffect(() => {
-        if (token) {
-            getData();
-        } else {
-            toast.error("No authentication token found. Please login again.");
+        if (!token) {
+            if (!authErrorShownRef.current) {
+                authErrorShownRef.current = true;
+                toast.error("No authentication token found. Please login again.");
+            }
+            return;
         }
-    }, [token]);
+        fetchSpotlights();
+        return () => {
+            loadRequestRef.current += 1;
+        };
+    }, [token, fetchSpotlights]);
 
     useEffect(() => {
         setColumns([
@@ -108,29 +151,6 @@ function SpotlightManagement() {
         }
     }, [isAdd]);
 
-    const getData = () => {
-        if (!loading) {
-            setLoading(true);
-            get("spotlight/admin/list", { token: token })
-                .then(res => {
-                    setLoading(false);
-                    if (res?.statusCode === 200) {
-                        setData(res?.data || []);
-                        if (!res?.data || res?.data.length === 0) {
-                            toast.info("No spotlights found");
-                        }
-                    } else {
-                        toast.error(res?.message || res?.error || "Failed to fetch spotlights");
-                    }
-                })
-                .catch(err => {
-                    setLoading(false);
-                    console.error("Error fetching spotlights:", err);
-                    toast.error("Something Went Wrong! Check console for details.");
-                })
-        }
-    }
-
     const handleUpdateStatus = (row) => {
         setCurrentData({ ...row, actionType: "ToggleStatus" });
         setConfirm(true);
@@ -152,7 +172,7 @@ function SpotlightManagement() {
                     if (res?.statusCode === 200) {
                         setConfirm(false);
                         toast.success("Status updated successfully");
-                        getData();
+                        fetchSpotlights();
                     } else {
                         toast.error(res?.message || res?.error || "Failed to update status");
                     }
@@ -160,7 +180,7 @@ function SpotlightManagement() {
                 .catch(err => {
                     setLoading(false);
                     console.error("Error updating status:", err);
-                    toast.error("Something Went Wrong!");
+                    toast.error("Failed to update spotlight status.");
                 });
         }
     }
@@ -200,7 +220,7 @@ function SpotlightManagement() {
                     if (res?.statusCode === 200) {
                         setConfirm(false);
                         toast.success("Deleted successfully");
-                        getData();
+                        fetchSpotlights();
                     } else {
                         toast.error(res?.message || res?.error || "Failed to delete");
                     }
@@ -208,7 +228,7 @@ function SpotlightManagement() {
                 .catch(err => {
                     setLoading(false);
                     console.error("Error deleting:", err);
-                    toast.error("Something Went Wrong!");
+                    toast.error("Failed to delete spotlight.");
                 });
         }
     }
@@ -244,7 +264,7 @@ function SpotlightManagement() {
                     if (res?.statusCode === 200) {
                         toast.success(`Spotlight ${currentData ? 'updated' : 'added'} successfully`);
                         setIsAdd(false);
-                        getData();
+                        fetchSpotlights();
                     } else {
                         toast.error(res?.message || res?.error || "Failed to save spotlight");
                     }
@@ -252,7 +272,7 @@ function SpotlightManagement() {
                 .catch(err => {
                     setLoading(false);
                     console.error("Error saving spotlight:", err);
-                    toast.error("Something Went Wrong!");
+                    toast.error("Failed to save spotlight.");
                 });
         }
     }
@@ -293,9 +313,22 @@ function SpotlightManagement() {
                                 </div>
                                 <div className='table-responsive'>
                                     <DataTable
+                        progressPending={loading}
+                        progressComponent={<DataTableSkeleton />}
                                         columns={columns}
                                         data={data || []}
                                         pagination
+                                        paginationComponentOptions={dataTablePaginationOptions}
+                                        customStyles={dataTableCustomStyles}
+                                        noDataComponent={
+                                            <AdminEmptyState
+                                                icon="ri-video-line"
+                                                title="No spotlights yet"
+                                                description="Add your first spotlight to feature products on the storefront."
+                                                actionLabel="Add Spotlight"
+                                                onAction={() => setIsAdd(true)}
+                                            />
+                                        }
                                     />
                                 </div>
                             </CardBody>
@@ -348,7 +381,6 @@ function SpotlightManagement() {
                 </Modal>
             </div>
             <Footer />
-            {loading && <Loader />}
         </React.Fragment>
     )
 }
