@@ -1,10 +1,10 @@
 {
   "files": {
-    "main.css": "./static/css/main.30353c95.css",
-    "main.js": "./static/js/main.025dbcdf.js",
+    "main.css": "./static/css/main.257619bc.css",
+    "main.js": "./static/js/main.e6492bb9.js",
     "static/js/787.f00cb4fb.chunk.js": "./static/js/787.f00cb4fb.chunk.js",
     "static/media/remixicon.svg?t=1590207869815": "./static/media/remixicon.9cedd2150922ead84869.svg",
-    "static/media/onwards.jpg": "./static/media/onwards.73293f9d9ace9c353f11.jpg",
+    "static/media/careveli-vitamin-c-serum.png": "./static/media/careveli-vitamin-c-serum.9d986f2749ac810cadea.png",
     "static/media/remixicon.eot?t=1590207869815": "./static/media/remixicon.5cb99e6cba5a4619063f.eot",
     "static/media/remixicon.ttf?t=1590207869815": "./static/media/remixicon.f2616f597cf98f38d234.ttf",
     "static/media/fa-solid-900.ttf": "./static/media/fa-solid-900.d75e3fd1eb12e9bd6655.ttf",
@@ -25,12 +25,12 @@
     "static/media/server_down.svg": "./static/media/server_down.744c59c77043d1d3d25874c6a00fc9c9.svg",
     "static/media/fa-v4compatibility.woff2": "./static/media/fa-v4compatibility.1bac2991f3dbfa237aec.woff2",
     "index.html": "./index.html",
-    "main.30353c95.css.map": "./static/css/main.30353c95.css.map",
-    "main.025dbcdf.js.map": "./static/js/main.025dbcdf.js.map",
+    "main.257619bc.css.map": "./static/css/main.257619bc.css.map",
+    "main.e6492bb9.js.map": "./static/js/main.e6492bb9.js.map",
     "787.f00cb4fb.chunk.js.map": "./static/js/787.f00cb4fb.chunk.js.map"
   },
   "entrypoints": [
-    "static/css/main.30353c95.css",
-    "static/js/main.025dbcdf.js"
+    "static/css/main.257619bc.css",
+    "static/js/main.e6492bb9.js"
   ]
 }

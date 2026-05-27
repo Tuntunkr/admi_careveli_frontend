@@ -120,6 +120,7 @@ class SidebarMenu extends Component {
                         </li>
                     </ul>
                 </div> */}
+                <div className="nav-label nav-label--static">OVERVIEW</div>
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
@@ -127,49 +128,15 @@ class SidebarMenu extends Component {
                         </li>
                     </ul>
                 </div>
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/category" className="nav-link"><i className={"fa fa-shapes"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>CATEGORY</span></NavLink>
-                        </li>
-                    </ul>
-                </div>
-                {/* <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/subCategory" className="nav-link"><i className={"fa fa-user-circle"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>SUB CATEGORY</span></NavLink>
-                        </li>
-                    </ul>
-                </div>
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/petCategory" className="nav-link"><i className={"fa fa-cog"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>PET CATEGORY</span></NavLink>
-                        </li>
-                    </ul>
-                </div>
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/recommended" className="nav-link"><i className={"fa fa-file-text"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>RECOMMENDED</span></NavLink>
-                        </li>
-                    </ul>
-                </div> */}
-                {/* <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/registered_pet" className="nav-link"><i className={"fa fa-cog"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>Registered User</span></NavLink>
-                        </li>
-                    </ul>
-                </div> */}
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/registered" className="nav-link"><i className={"fa fa-registered"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>REGISTERED USER</span></NavLink>
-                        </li>
-                    </ul>
-                </div>
 
+                <div className="nav-label nav-label--static">CATALOG</div>
+                <div className="nav-group show">
+                    <ul className="nav nav-sidebar py-0">
+                        <li className="nav-item">
+                            <NavLink to="/category" className="nav-link"><i className={"fa fa-shapes"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>CATEGORIES</span></NavLink>
+                        </li>
+                    </ul>
+                </div>
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
@@ -178,6 +145,7 @@ class SidebarMenu extends Component {
                     </ul>
                 </div>
 
+                <div className="nav-label nav-label--static">SALES</div>
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
@@ -185,11 +153,19 @@ class SidebarMenu extends Component {
                         </li>
                     </ul>
                 </div>
-
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
-                            <NavLink to="/banner" className="nav-link"><i className={"ri-image-2-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BANNER</span></NavLink>
+                            <NavLink to="/registered" className="nav-link"><i className={"fa fa-registered"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>REGISTERED USERS</span></NavLink>
+                        </li>
+                    </ul>
+                </div>
+
+                <div className="nav-label nav-label--static">CONTENT</div>
+                <div className="nav-group show">
+                    <ul className="nav nav-sidebar py-0">
+                        <li className="nav-item">
+                            <NavLink to="/banner" className="nav-link"><i className={"ri-image-2-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BANNERS</span></NavLink>
                         </li>
                     </ul>
                 </div>
@@ -202,6 +178,15 @@ class SidebarMenu extends Component {
                     </ul>
                 </div>
 
+                <div className="nav-group show">
+                    <ul className="nav nav-sidebar py-0">
+                        <li className="nav-item">
+                            <NavLink to="/blog-editor" className="nav-link"><i className={"ri-article-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BLOGS</span></NavLink>
+                        </li>
+                    </ul>
+                </div>
+
+                <div className="nav-label nav-label--static">MESSAGES</div>
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
@@ -222,13 +207,6 @@ class SidebarMenu extends Component {
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
                             <NavLink to="/newsletter" className="nav-link"><i className={"ri-mail-send-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>NEWSLETTER</span></NavLink>
-                        </li>
-                    </ul>
-                </div>
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/blog-editor" className="nav-link"><i className={"ri-article-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BLOGS</span></NavLink>
                         </li>
                     </ul>
                 </div>
