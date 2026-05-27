@@ -197,8 +197,6 @@ class SidebarMenu extends Component {
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
-<<<<<<< HEAD
-=======
                             <NavLink to="/spotlight" className="nav-link"><i className={"ri-video-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>SPOTLIGHT</span></NavLink>
                         </li>
                     </ul>
@@ -207,7 +205,6 @@ class SidebarMenu extends Component {
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
->>>>>>> origin/manish
                             <NavLink to="/contact" className="nav-link"><i className={"fa fa-envelope"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>CONTACT MESSAGES</span></NavLink>
                         </li>
                     </ul>
@@ -228,18 +225,10 @@ class SidebarMenu extends Component {
                         </li>
                     </ul>
                 </div>
-<<<<<<< HEAD
-
-                <div className="nav-group show">
-                    <ul className="nav nav-sidebar py-0">
-                        <li className="nav-item">
-                            <NavLink to="/blogs" className="nav-link"><i className={"ri-article-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BLOG EDITOR</span></NavLink>
-=======
                 <div className="nav-group show">
                     <ul className="nav nav-sidebar py-0">
                         <li className="nav-item">
                             <NavLink to="/blog-editor" className="nav-link"><i className={"ri-article-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>BLOGS</span></NavLink>
->>>>>>> origin/manish
                         </li>
                     </ul>
                 </div>

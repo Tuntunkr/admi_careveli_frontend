@@ -279,11 +279,7 @@ function CategoryManagement() {
                             <div className='action-btn' style={{ marginTop: '20px' }}>
                                 <button
                                     type="button"
-<<<<<<< HEAD
                                     style={{ border: 'none', backgroundColor: Utils.themeColor }}
-=======
-                                    style={{ border: 'none', }}
->>>>>>> origin/manish
                                     className="btn btn-dark"
                                     onClick={() => { setCurrentData(null); setIsAdd(true) }}
                                 >
@@ -335,11 +331,7 @@ function CategoryManagement() {
                         </div>
 
                         <div className="text-end">
-<<<<<<< HEAD
                             <Button type="button" className="btn-light" onClick={() => setIsAdd(false)} style={{ marginRight: 10 }}>Cancel</Button>
-=======
-                            <Button type="button" className="btn-light" onClick={() => setIsAdd(false)} style={{ marginRight: 10, color: 'white' }}>Cancel</Button>
->>>>>>> origin/manish
                             <Button type="submit" className="btn-primary" disabled={loading} style={{ backgroundColor: Utils.themeColor, border: 'none' }}>{currentData ? "Update" : "Save"}</Button>
                         </div>
                     </AvForm>

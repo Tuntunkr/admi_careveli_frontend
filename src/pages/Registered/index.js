@@ -70,16 +70,6 @@ function Registered() {
 
             },
             {
-<<<<<<< HEAD
-                name: "Profile",
-                cell: (row) => <>
-                    <img src={row?.profilePic !== "" ? row.profilePic : defaultProfilePic} style={{ width: 70, height: 70, padding: 10, borderRadius: '50%', objectFit: 'cover' }} alt="Profile" />
-                </>,
-                maxWidth: '100px'
-            },
-            {
-=======
->>>>>>> origin/manish
                 name: 'Name',
                 cell: (row, index) => <>
                     <p className='mb-0'>{row.name || row.userName || 'N/A'}</p>
@@ -89,9 +79,6 @@ function Registered() {
             {
                 name: 'Email',
                 cell: (row, index) => <>
-<<<<<<< HEAD
-                    <p className='mb-0'>{row.email || row.emailId || 'N/A'}</p>
-=======
                     <div className="d-flex align-items-center">
                         <p className='mb-0 me-2'>{row.email || row.emailId || 'N/A'}</p>
                         {(row.email || row.emailId) && (
@@ -106,7 +93,6 @@ function Registered() {
                             ></i>
                         )}
                     </div>
->>>>>>> origin/manish
                 </>,
                 minWidth: '200px'
             },
@@ -140,8 +126,6 @@ function Registered() {
                 selector: row => moment(row?.createdAt || row?.updatedAt).format("DD-MMM-YYYY"),
                 minWidth: '130px'
             },
-<<<<<<< HEAD
-=======
             {
                 name: 'Total Orders',
                 cell: (row) => <span>{row?.activity?.totalOrdersCount || 0}</span>,
@@ -152,7 +136,6 @@ function Registered() {
                 cell: (row) => <span>₹{row?.activity?.totalPaymentAmount || 0}</span>,
                 minWidth: '110px'
             }
->>>>>>> origin/manish
         ])
     }, [data, currentPage, perPage]);
 
@@ -230,33 +213,19 @@ function Registered() {
                 </Col>
                 <Col lg={3} md={6}>
                     <div className='expend_detail mb-2'>
-<<<<<<< HEAD
-                        <h6 className='mb-1'><strong>Email Verified:</strong></h6>
-                        <p className='mb-0'>
-                            <span className={`badge ${data?.isEmailVerified ? 'bg-success' : 'bg-warning'}`}>
-                                {data?.isEmailVerified ? 'Yes' : 'No'}
-                            </span>
-=======
                         <h6 className='mb-1'><strong>Status Breakdown:</strong></h6>
                         <p className='mb-0'>
                             <span className="badge bg-success me-1 cursor-pointer" title="Success">S: {data?.activity?.paymentStatuses?.success || 0}</span>
                             <span className="badge bg-danger me-1 cursor-pointer" title="Failed">F: {data?.activity?.paymentStatuses?.failed || 0}</span>
                             <span className="badge bg-warning text-dark cursor-pointer" title="Pending">P: {data?.activity?.paymentStatuses?.pending || 0}</span>
->>>>>>> origin/manish
                         </p>
                     </div>
                 </Col>
                 <Col lg={3} md={6}>
                     <div className='expend_detail mb-2'>
-<<<<<<< HEAD
-                        <h6 className='mb-1'><strong>Addresses:</strong></h6>
-                        <p className='mb-0 text-muted' style={{ fontSize: '0.9rem' }}>
-                            {data?.addresses?.length || 0} Address(es)
-=======
                         <h6 className='mb-1'><strong>Total Spent:</strong></h6>
                         <p className='mb-0 text-muted' style={{ fontSize: '0.9rem' }}>
                             ₹{data?.activity?.totalPaymentAmount || 0}
->>>>>>> origin/manish
                         </p>
                     </div>
                 </Col>
@@ -269,8 +238,6 @@ function Registered() {
                     </div>
                 </Col>
             </Row>
-<<<<<<< HEAD
-=======
             {data?.activity?.orderHistory?.length > 0 && (
                 <Row className="mt-3">
                     <Col>
@@ -302,7 +269,6 @@ function Registered() {
                     </Col>
                 </Row>
             )}
->>>>>>> origin/manish
         </div>
 
     return (

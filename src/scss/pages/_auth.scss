@@ -10,7 +10,6 @@
 
   &.d-block {
     @include gradient-x($primary, darken($primary, 15%), 40%);
-<<<<<<< HEAD
     min-height: 100vh;
     max-height: 100vh;
     overflow: hidden;
@@ -19,10 +18,6 @@
       min-height: inherit;
       max-height: 100vh;
     }
-=======
-
-    .row { min-height: inherit; }
->>>>>>> origin/manish
 
     .col-wrapper {
       min-height: inherit;
@@ -32,7 +27,6 @@
       background-color: #fff;
     }
 
-<<<<<<< HEAD
     .auth-img-col {
       overflow: hidden;
       height: 100vh;
@@ -43,8 +37,6 @@
       padding: 0;
     }
 
-=======
->>>>>>> origin/manish
     .card-sign {
       border-radius: 0;
       box-shadow: none;
@@ -192,15 +184,9 @@
 .auth-img {
   width: 100%;
   height: 100%;
-<<<<<<< HEAD
   max-height: 100vh;
   object-fit: contain;
   object-position: center;
-=======
-  object-fit: cover;
-  // mix-blend-mode: luminosity;
-  // opacity: .3;
->>>>>>> origin/manish
 }
 
 .card-auth {

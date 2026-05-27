@@ -82,11 +82,7 @@ function Order() {
                     {/* Order Items */}
                     <Col md={6}>
                         <h6 className="mb-3" style={{ fontWeight: 'bold', color: '#333' }}>
-<<<<<<< HEAD
                             📦 Order Items ({orderItems.length})
-=======
-                            Order Items ({orderItems.length})
->>>>>>> origin/manish
                         </h6>
                         {orderItems.length > 0 ? (
                             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
@@ -718,11 +714,7 @@ function Order() {
                 <Card className="card-one">
                     <CardBody>
                         <CardTitle tag="h6" className="mb-3">
-<<<<<<< HEAD
-                            📦 All Orders  ({pagination.totalOrders || data.length})
-=======
                             📦 All Orders ({pagination.totalOrders || data.length})
->>>>>>> origin/manish
                         </CardTitle>
 
                         {loading ? (
