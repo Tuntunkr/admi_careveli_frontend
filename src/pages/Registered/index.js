@@ -119,30 +119,6 @@ function UserDetailsContent({ user: row }) {
                 </Col>
             </Row>
 
-            <div className="mb-4">
-                <h6 className="fw-semibold mb-2">
-                    <i className="ri-wallet-3-line me-1" />
-                    Payment summary
-                </h6>
-                <div className="d-flex flex-wrap gap-2">
-                    <span className="badge bg-success">
-                        Successful: {row?.activity?.paymentStatuses?.success ?? 0}
-                    </span>
-                    <span className="badge bg-danger">
-                        Failed: {row?.activity?.paymentStatuses?.failed ?? 0}
-                    </span>
-                    <span className="badge bg-warning text-dark">
-                        Pending: {row?.activity?.paymentStatuses?.pending ?? 0}
-                    </span>
-                    <span className="badge bg-light text-dark border">
-                        Total spent: ₹{row?.activity?.totalPaymentAmount ?? 0}
-                    </span>
-                    <span className="badge bg-light text-dark border">
-                        Orders: {row?.activity?.totalOrdersCount ?? 0}
-                    </span>
-                </div>
-            </div>
-
             <div>
                 <h6 className="fw-semibold mb-2">
                     <i className="ri-shopping-bag-line me-1" />

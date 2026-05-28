@@ -20,7 +20,7 @@ import {
 } from '../../Utils/analyticsDashboard';
 import '../../assets/css/admin-dashboard.css';
 import {
-    LineChart, Line, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+    XAxis, YAxis, Tooltip, ResponsiveContainer,
     PieChart, Pie, Cell
 } from 'recharts';
 
@@ -45,7 +45,7 @@ const QUICK_ACTIONS = [
     { label: 'Banners', icon: 'ri-image-2-line', path: '/banner', color: '#16A34A', bg: '#DCFCE7', countKey: 'totalBanners' },
 ];
 
-const KPI_ACCENTS = ['#16A34A', '#EA580C', '#2563EB', '#9333EA', '#4F46E5', '#D97706', '#DC2626', '#0D9488'];
+const KPI_ACCENTS = ['#16A34A', '#EA580C', '#2563EB', '#9333EA'];
 
 const EmptyTableRow = ({ colSpan, message }) => (
     <tr>
@@ -68,10 +68,8 @@ export default function AdminDashboard() {
         () => localStorage.getItem('dashboard-preview-dismissed') !== '1'
     );
     const [stats, setStats] = useState(null);
-    const [chartData, setChartData] = useState([]);
     const [recentOrders, setRecentOrders] = useState([]);
     const [timeFilter, setTimeFilter] = useState('last30days');
-    const [chartInterval, setChartInterval] = useState('monthly');
     const [lastRefreshed, setLastRefreshed] = useState(null);
 
     const switchSkin = (mode) => {
@@ -105,13 +103,6 @@ export default function AdminDashboard() {
         return Math.max(...list.map(item => item.count || 0), 1);
     }, [displayStats]);
 
-    const hasChartValues = useMemo(
-        () => chartData.some(
-            item => Number(item.Revenue) > 0 || Number(item.Sales) > 0 || Number(item.Orders) > 0
-        ),
-        [chartData]
-    );
-
     const formatCurrency = (amount) =>
         new Intl.NumberFormat('en-IN', {
             style: 'currency',
@@ -129,15 +120,14 @@ export default function AdminDashboard() {
         });
     };
 
-    const fetchAnalytics = async (_filter = timeFilter, interval = chartInterval, silent = false) => {
+    const fetchAnalytics = async (_filter = timeFilter, silent = false) => {
         if (!silent) setLoading(true);
 
         try {
             if (USE_MOCK_DATA) {
                 await new Promise(resolve => setTimeout(resolve, 700));
-                const mock = getMockDashboardPreview(interval);
+                const mock = getMockDashboardPreview('monthly');
                 setStats(mock.stats);
-                setChartData(mock.chartData);
                 setRecentOrders(mock.recentOrders);
             } else {
                 // const token = user?.token || localStorage.getItem('adminToken');
@@ -173,7 +163,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         fetchAnalytics();
-    }, [timeFilter, chartInterval]);
+    }, [timeFilter]);
 
     // useEffect(() => {
     //     const token = user?.token || localStorage.getItem('adminToken');
@@ -309,7 +299,11 @@ export default function AdminDashboard() {
 
                 {!loading && stats && (
                     <>
-                        {/* KPI Row — 8 standard metrics */}
+                        {/* KPI Row — core metrics */}
+                        <div className="dashboard-section-head mb-3">
+                            <h6 className="dashboard-section-title mb-1">Main Overview</h6>
+                            <p className="dashboard-section-subtitle mb-0">Core performance metrics for daily decisions</p>
+                        </div>
                         <Row className="g-3 mb-4">
                             <Col xs={12} sm={6} xl={3}>
                                 <DashboardStatCard
@@ -339,38 +333,13 @@ export default function AdminDashboard() {
                             </Col>
                             <Col xs={12} sm={6} xl={3}>
                                 <DashboardStatCard
-                                    label="Avg. Order Value"
-                                    value={formatCurrency(metrics.averageOrderValue)}
-                                    icon="ri-line-chart-line"
-                                    iconBg="#DBEAFE"
-                                    iconColor="#2563EB"
-                                    accentColor={KPI_ACCENTS[2]}
-                                />
-                            </Col>
-                            <Col xs={12} sm={6} xl={3}>
-                                <DashboardStatCard
                                     label="Total Customers"
                                     value={metrics.totalUsers}
                                     icon="ri-group-line"
                                     iconBg="#F3E8FF"
                                     iconColor="#9333EA"
-                                    accentColor={KPI_ACCENTS[3]}
+                                    accentColor={KPI_ACCENTS[2]}
                                     subtext={`${metrics.activeUsers} active`}
-                                />
-                            </Col>
-                            <Col xs={12} sm={6} xl={3}>
-                                <DashboardStatCard
-                                    label="Total Products"
-                                    value={metrics.totalProducts}
-                                    icon="ri-shopping-bag-line"
-                                    iconBg="#E0E7FF"
-                                    iconColor="#4F46E5"
-                                    accentColor={KPI_ACCENTS[4]}
-                                    subtext={
-                                        metrics.activeProducts > 0
-                                            ? `${metrics.activeProducts} active listing${metrics.activeProducts === 1 ? '' : 's'}`
-                                            : undefined
-                                    }
                                 />
                             </Col>
                             <Col xs={12} sm={6} xl={3}>
@@ -380,33 +349,16 @@ export default function AdminDashboard() {
                                     icon="ri-time-line"
                                     iconBg="#FEF3C7"
                                     iconColor="#D97706"
-                                    accentColor={KPI_ACCENTS[5]}
-                                />
-                            </Col>
-                            <Col xs={12} sm={6} xl={3}>
-                                <DashboardStatCard
-                                    label="Low Stock Alerts"
-                                    value={metrics.lowStockCount}
-                                    icon="ri-error-warning-line"
-                                    iconBg="#FEE2E2"
-                                    iconColor="#DC2626"
-                                    accentColor={KPI_ACCENTS[6]}
-                                />
-                            </Col>
-                            <Col xs={12} sm={6} xl={3}>
-                                <DashboardStatCard
-                                    label="Fulfillment Rate"
-                                    value={`${metrics.fulfillmentRate}%`}
-                                    icon="ri-truck-line"
-                                    iconBg="#CCFBF1"
-                                    iconColor="#0D9488"
-                                    accentColor={KPI_ACCENTS[7]}
-                                    subtext={`${metrics.deliveredOrders} delivered`}
+                                    accentColor={KPI_ACCENTS[3]}
                                 />
                             </Col>
                         </Row>
 
                         {/* Quick actions */}
+                        <div className="dashboard-section-head mb-3">
+                            <h6 className="dashboard-section-title mb-1">Quick Actions</h6>
+                            <p className="dashboard-section-subtitle mb-0">Fast access to key management sections</p>
+                        </div>
                         <Row className="g-3 mb-4">
                             {QUICK_ACTIONS.map(action => (
                                 <Col xs={6} md={3} key={action.path}>
@@ -433,91 +385,11 @@ export default function AdminDashboard() {
                             ))}
                         </Row>
 
-                        {/* Charts — revenue trend + orders bar */}
-                        <Row className="g-3 mb-4">
-                            <Col xs={12}>
-                                <Card className="border-0 shadow-sm h-100">
-                                    <Card.Body>
-                                        <div className="d-flex justify-content-between align-items-center flex-wrap gap-3 mb-4">
-                                            <div>
-                                                <h6 className="mb-0 fw-bold">Revenue & Sales Trend</h6>
-                                                <p className="text-secondary small mb-0">Performance over time</p>
-                                            </div>
-                                            <Form.Select
-                                                size="sm"
-                                                value={chartInterval}
-                                                onChange={(e) => setChartInterval(e.target.value)}
-                                                style={{ width: 'auto', minWidth: '120px' }}
-                                            >
-                                                <option value="daily">Daily</option>
-                                                <option value="weekly">Weekly</option>
-                                                <option value="monthly">Monthly</option>
-                                            </Form.Select>
-                                        </div>
-                                        <div className="dashboard-chart-xl position-relative">
-                                            {chartData.length && hasChartValues ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <LineChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                                        <XAxis dataKey="name" tick={{ fontSize: 11 }} />
-                                                        <YAxis tick={{ fontSize: 11 }} />
-                                                        <Tooltip formatter={(v) => formatCurrency(v)} />
-                                                        <Legend />
-                                                        <Line type="monotone" dataKey="Revenue" stroke="#10B981" strokeWidth={2} dot={false} />
-                                                        <Line type="monotone" dataKey="Sales" stroke="#8B5CF6" strokeWidth={2} dot={false} />
-                                                    </LineChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="dashboard-chart-empty">
-                                                    <i className="ri-line-chart-line d-block mb-2" style={{ fontSize: '2rem' }} />
-                                                    No data available for this period
-                                                </div>
-                                            )}
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                            <Col xs={12}>
-                                <Card className="border-0 shadow-sm h-100">
-                                    <Card.Body>
-                                        <h6 className="mb-1 fw-bold">Orders Overview</h6>
-                                        <p className="text-secondary small mb-3">Volume by period</p>
-                                        <div className="dashboard-chart-lg position-relative">
-                                            {chartData.length && hasChartValues ? (
-                                                <ResponsiveContainer width="100%" height="100%">
-                                                    <BarChart data={chartData}>
-                                                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                                                        <XAxis dataKey="name" tick={{ fontSize: 10 }} />
-                                                        <YAxis tick={{ fontSize: 10 }} />
-                                                        <Tooltip />
-                                                        <Bar dataKey="Orders" fill="#3B82F6" radius={[4, 4, 0, 0]} />
-                                                    </BarChart>
-                                                </ResponsiveContainer>
-                                            ) : (
-                                                <div className="dashboard-chart-empty">
-                                                    <i className="ri-bar-chart-line d-block mb-2" style={{ fontSize: '2rem' }} />
-                                                    No data available for this period
-                                                </div>
-                                            )}
-                                        </div>
-                                        <div className="dashboard-insight-list mt-3">
-                                            <div className="d-flex justify-content-between small mb-2">
-                                                <span className="text-secondary">Payment success</span>
-                                                <strong>{metrics.paymentSuccessRate}%</strong>
-                                            </div>
-                                            <ProgressBar now={metrics.paymentSuccessRate} variant="success" style={{ height: 6 }} />
-                                            <div className="d-flex justify-content-between small mt-3 mb-2">
-                                                <span className="text-secondary">Fulfillment rate</span>
-                                                <strong>{metrics.fulfillmentRate}%</strong>
-                                            </div>
-                                            <ProgressBar now={metrics.fulfillmentRate} variant="info" style={{ height: 6 }} />
-                                        </div>
-                                    </Card.Body>
-                                </Card>
-                            </Col>
-                        </Row>
-
                         {/* Order status breakdown + pies */}
+                        <div className="dashboard-section-head mb-3">
+                            <h6 className="dashboard-section-title mb-1">Operations Snapshot</h6>
+                            <p className="dashboard-section-subtitle mb-0">Live operational health across orders, payments, and users</p>
+                        </div>
                         <Row className="g-3 mb-4">
                             <Col xs={12} lg={4}>
                                 <Card className="border-0 shadow-sm h-100">
@@ -569,6 +441,10 @@ export default function AdminDashboard() {
                         </Row>
 
                         {/* Tables — recent orders, top products, low stock */}
+                        <div className="dashboard-section-head mb-3">
+                            <h6 className="dashboard-section-title mb-1">Business Tables</h6>
+                            <p className="dashboard-section-subtitle mb-0">Detailed records for follow-up and action</p>
+                        </div>
                         <Row className="g-3 mb-4">
                             <Col xs={12} lg={5}>
                                 <Card className="border-0 shadow-sm h-100">
