@@ -17,6 +17,20 @@
     background-color: #000 !important;
 }
 
+/* Cancel in modals: avoid btn-primary (default) + btn-light = black bg + dark text */
+.btn.btn-outline-secondary {
+    color: #374151 !important;
+    border-color: #9ca3af !important;
+    background-color: #fff !important;
+}
+
+.btn.btn-outline-secondary:hover,
+.btn.btn-outline-secondary:focus {
+    color: #111827 !important;
+    background-color: #f3f4f6 !important;
+    border-color: #6b7280 !important;
+}
+
 .action-btn {
     height: 100%;
     width: 100%;

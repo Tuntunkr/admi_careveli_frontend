@@ -7,7 +7,6 @@ import DataTable from 'react-data-table-component';
 import DataTableSkeleton from '../../components/DataTableSkeleton';
 import Header from '../../layouts/Header';
 import Footer from '../../layouts/Footer';
-import Loader from '../../layouts/Loader';
 import moment from 'moment';
 import {
     getAllTestimonials,
@@ -18,9 +17,32 @@ import {
     exportTestimonialsToCSV,
     downloadCSV
 } from '../../helper/testimonial_helper';
+import { getAllProducts } from '../../helper/product_helper';
 import * as Utils from '../../Utils';
 import StarRating from '../../components/admin/StarRating';
 import { dataTableCustomStyles, dataTablePaginationOptions } from '../../components/admin/dataTableConfig';
+
+function resolveTestimonialProductId(testimonial) {
+    if (!testimonial) return '';
+    if (testimonial.productId) return String(testimonial.productId);
+    if (testimonial.product_id) return String(testimonial.product_id);
+    if (testimonial.product && typeof testimonial.product === 'object') {
+        return String(testimonial.product._id || testimonial.product.id || '');
+    }
+    if (typeof testimonial.product === 'string') return testimonial.product;
+    return '';
+}
+
+function getTestimonialProductName(testimonial, products = []) {
+    if (testimonial?.product && typeof testimonial.product === 'object') {
+        return testimonial.product.name || testimonial.product.title || '—';
+    }
+    if (testimonial?.productName) return testimonial.productName;
+    const productId = resolveTestimonialProductId(testimonial);
+    if (!productId) return '—';
+    const match = products.find(p => String(p._id) === String(productId));
+    return match?.name || '—';
+}
 
 function Testimonial() {
     const user = useSelector(state => state.user);
@@ -29,6 +51,8 @@ function Testimonial() {
     const [filteredTestimonials, setFilteredTestimonials] = useState([]);
     const [searchText, setSearchText] = useState('');
     const [filterStatus, setFilterStatus] = useState('all'); // all, active, inactive
+    const [products, setProducts] = useState([]);
+    const [productsLoading, setProductsLoading] = useState(false);
 
     // Modal states
     const [showModal, setShowModal] = useState(false);
@@ -41,6 +65,7 @@ function Testimonial() {
         rating: 5,
         title: '',
         review: '',
+        productId: '',
         isVerified: false,
         isActive: true
     });
@@ -112,6 +137,18 @@ function Testimonial() {
             width: '200px'
         },
         {
+            name: 'Product',
+            selector: row => getTestimonialProductName(row, products),
+            sortable: true,
+            wrap: true,
+            minWidth: '160px',
+            cell: row => (
+                <span className="small fw-medium" title={getTestimonialProductName(row, products)}>
+                    {getTestimonialProductName(row, products)}
+                </span>
+            ),
+        },
+        {
             name: 'Review',
             selector: row => row.review,
             cell: row => (
@@ -180,7 +217,30 @@ function Testimonial() {
 
     useEffect(() => {
         fetchTestimonials();
+        fetchProducts();
     }, []);
+
+    const fetchProducts = async () => {
+        setProductsLoading(true);
+        try {
+            const res = await getAllProducts({ page: 1, limit: 500 });
+            let list = [];
+            if (res?.success && Array.isArray(res?.data?.products)) {
+                list = res.data.products;
+            } else if (Array.isArray(res?.products)) {
+                list = res.products;
+            } else if (Array.isArray(res?.data)) {
+                list = res.data;
+            }
+            setProducts(list);
+        } catch (err) {
+            console.error('Error fetching products:', err);
+            toast.error('Failed to load products list');
+            setProducts([]);
+        } finally {
+            setProductsLoading(false);
+        }
+    };
 
     // Filter testimonials based on search text and status
     useEffect(() => {
@@ -195,15 +255,17 @@ function Testimonial() {
 
         // Filter by search text
         if (searchText) {
+            const q = searchText.toLowerCase();
             filtered = filtered.filter(t =>
-                t.name.toLowerCase().includes(searchText.toLowerCase()) ||
-                t.title?.toLowerCase().includes(searchText.toLowerCase()) ||
-                t.review?.toLowerCase().includes(searchText.toLowerCase())
+                t.name.toLowerCase().includes(q) ||
+                t.title?.toLowerCase().includes(q) ||
+                t.review?.toLowerCase().includes(q) ||
+                getTestimonialProductName(t, products).toLowerCase().includes(q)
             );
         }
 
         setFilteredTestimonials(filtered);
-    }, [searchText, filterStatus, testimonials]);
+    }, [searchText, filterStatus, testimonials, products]);
 
     // Fetch all testimonials
     const fetchTestimonials = async () => {
@@ -259,6 +321,7 @@ function Testimonial() {
             rating: 5,
             title: '',
             review: '',
+            productId: '',
             isVerified: false,
             isActive: true
         });
@@ -276,6 +339,7 @@ function Testimonial() {
             rating: testimonial.rating,
             title: testimonial.title || '',
             review: testimonial.review || '',
+            productId: resolveTestimonialProductId(testimonial),
             isVerified: testimonial.isVerified,
             isActive: testimonial.isActive
         });
@@ -321,6 +385,10 @@ function Testimonial() {
             toast.error('Review is required');
             return;
         }
+        if (!formData.productId) {
+            toast.error('Please select a product for this review');
+            return;
+        }
 
         setSubmitting(true);
         const token = user?.token || localStorage.getItem('adminToken');
@@ -331,6 +399,7 @@ function Testimonial() {
             data.append('rating', formData.rating);
             data.append('title', formData.title);
             data.append('review', formData.review);
+            data.append('productId', formData.productId);
             data.append('isVerified', formData.isVerified);
             data.append('isActive', formData.isActive);
 
@@ -416,8 +485,6 @@ function Testimonial() {
         }
     };
 
-    if (loading) return <Loader />;
-
     return (
         <React.Fragment>
             <Header />
@@ -440,7 +507,7 @@ function Testimonial() {
                         <Button
                             variant="success"
                             onClick={handleExportCSV}
-                            disabled={filteredTestimonials.length === 0}
+                            disabled={loading || filteredTestimonials.length === 0}
                         >
                             <i className="fa fa-download"></i> Export CSV
                         </Button>
@@ -458,12 +525,14 @@ function Testimonial() {
                                                 type="text"
                                                 placeholder="Search by name, title, or review..."
                                                 value={searchText}
+                                                disabled={loading}
                                                 onChange={(e) => setSearchText(e.target.value)}
                                             />
                                         </Col>
                                         <Col md={3}>
                                             <Form.Select
                                                 value={filterStatus}
+                                                disabled={loading}
                                                 onChange={(e) => setFilterStatus(e.target.value)}
                                             >
                                                 <option value="all">All Status</option>
@@ -474,6 +543,7 @@ function Testimonial() {
                                         <Col md={3} className="text-end">
                                             <Button
                                                 variant="outline-secondary"
+                                                disabled={loading}
                                                 onClick={() => {
                                                     setSearchText('');
                                                     setFilterStatus('all');
@@ -486,8 +556,8 @@ function Testimonial() {
                                 </div>
 
                                 <DataTable
-                        progressPending={loading}
-                        progressComponent={<DataTableSkeleton />}
+                                    progressPending={loading}
+                                    progressComponent={<DataTableSkeleton rows={10} columns={9} />}
                                     columns={columns}
                                     data={filteredTestimonials}
                                     pagination
@@ -547,6 +617,34 @@ function Testimonial() {
                                     </Form.Group>
                                 </Col>
                             </Row>
+
+                            <Form.Group className="mb-3">
+                                <Form.Label>
+                                    Product <span className="text-danger">*</span>
+                                </Form.Label>
+                                <Form.Select
+                                    value={formData.productId}
+                                    onChange={(e) => setFormData({ ...formData, productId: e.target.value })}
+                                    required
+                                    disabled={productsLoading || !products.length}
+                                >
+                                    <option value="">
+                                        {productsLoading
+                                            ? 'Loading products…'
+                                            : products.length
+                                                ? 'Select product for this review'
+                                                : 'No products available'}
+                                    </option>
+                                    {products.map(product => (
+                                        <option key={product._id} value={product._id}>
+                                            {product.name}
+                                        </option>
+                                    ))}
+                                </Form.Select>
+                                <Form.Text className="text-muted">
+                                    Customer review will be linked to the selected product (e.g. Vitamin C, Kojic Acid).
+                                </Form.Text>
+                            </Form.Group>
 
                             <Form.Group className="mb-3">
                                 <Form.Label>Profile Image</Form.Label>

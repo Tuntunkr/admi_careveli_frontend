@@ -341,8 +341,8 @@ function CategoryManagement() {
                         </div>
 
                         <div className="text-end">
-                            <Button type="button" className="btn-light" onClick={() => setIsAdd(false)} style={{ marginRight: 10 }}>Cancel</Button>
-                            <Button type="submit" className="btn-primary" disabled={loading} style={{ backgroundColor: Utils.themeColor, border: 'none' }}>{currentData ? "Update" : "Save"}</Button>
+                            <Button type="button" variant="outline-secondary" className="me-2" onClick={() => setIsAdd(false)}>Cancel</Button>
+                            <Button type="submit" variant="primary" disabled={loading} style={{ backgroundColor: Utils.themeColor, border: 'none' }}>{currentData ? "Update" : "Save"}</Button>
                         </div>
                     </AvForm>
                 </div>

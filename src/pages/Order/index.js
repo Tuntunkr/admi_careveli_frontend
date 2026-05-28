@@ -26,9 +26,7 @@ import {
     computeOrderStatistics,
     getStatusBadgeColor,
     getPaymentStatusBadgeColor,
-    getOrderStatuses,
-    getPaymentMethods,
-    getPaymentStatuses
+    getOrderStatuses
 } from '../../helper/order_helper';
 import {
     createShipcluesShipmentFromOrder,
@@ -118,14 +116,28 @@ function OrderDetailsContent({ data }) {
                                 {shippingAddress.city}, {shippingAddress.state} - {shippingAddress.zipcode}
                             </p>
                             <p className="mb-1 text-muted small">{shippingAddress.country}</p>
-                            <p className="mb-1 text-muted small">
-                                <i className="ri-mail-line me-1" />
-                                {shippingAddress.email}
-                            </p>
-                            <p className="mb-0 text-muted small">
-                                <i className="ri-phone-line me-1" />
-                                {shippingAddress.phone}
-                            </p>
+                            {shippingAddress.email ? (
+                                <p className="mb-1 text-muted small">{shippingAddress.email}</p>
+                            ) : null}
+                            {shippingAddress.phone ? (
+                                <div className="d-flex align-items-center gap-2 mb-0">
+                                    <span className="text-muted small">
+                                        <i className="ri-phone-line me-1" />
+                                        {shippingAddress.phone}
+                                    </span>
+                                    <button
+                                        type="button"
+                                        className="btn btn-sm btn-light border-0 p-1"
+                                        title="Copy phone number"
+                                        onClick={() => {
+                                            navigator.clipboard.writeText(String(shippingAddress.phone));
+                                            toast.success('Phone number copied');
+                                        }}
+                                    >
+                                        <i className="ri-file-copy-line text-primary" />
+                                    </button>
+                                </div>
+                            ) : null}
                         </CardBody>
                     </Card>
                     <h6 className="mb-3 fw-bold">
@@ -189,10 +201,6 @@ function Order() {
         limit: 20,
         search: '',
         status: '',
-        paymentMethod: '',
-        paymentStatus: '',
-        sortBy: 'date',
-        order: 'desc',
         startDate: '',
         endDate: ''
     });
@@ -205,8 +213,6 @@ function Order() {
     });
 
     const orderStatuses = getOrderStatuses();
-    const paymentMethods = getPaymentMethods();
-    const paymentStatuses = getPaymentStatuses();
 
     useEffect(() => {
         loadColumns();
@@ -232,10 +238,6 @@ function Order() {
         filters.limit,
         filters.search,
         filters.status,
-        filters.paymentMethod,
-        filters.paymentStatus,
-        filters.sortBy,
-        filters.order,
         filters.startDate,
         filters.endDate
     ]);
@@ -359,10 +361,6 @@ function Order() {
             if (filters.limit) params.limit = filters.limit;
             if (filters.search) params.search = filters.search;
             if (filters.status) params.status = filters.status;
-            if (filters.paymentMethod) params.paymentMethod = filters.paymentMethod;
-            if (filters.paymentStatus) params.paymentStatus = filters.paymentStatus;
-            if (filters.sortBy) params.sortBy = filters.sortBy;
-            if (filters.order) params.order = filters.order;
             if (filters.startDate) params.startDate = filters.startDate;
             if (filters.endDate) params.endDate = filters.endDate;
 
@@ -610,10 +608,6 @@ function Order() {
             limit: 20,
             search: '',
             status: '',
-            paymentMethod: '',
-            paymentStatus: '',
-            sortBy: 'date',
-            order: 'desc',
             startDate: '',
             endDate: ''
         });
@@ -723,36 +717,6 @@ function Order() {
                                 </Input>
                             </Col>
 
-                            {/* Payment Method Filter */}
-                            <Col md={3}>
-                                <Label>Payment Method</Label>
-                                <Input
-                                    type="select"
-                                    value={filters.paymentMethod}
-                                    onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                                >
-                                    <option value="">All Methods</option>
-                                    {paymentMethods.map(method => (
-                                        <option key={method} value={method}>{method}</option>
-                                    ))}
-                                </Input>
-                            </Col>
-
-                            {/* Payment Status Filter */}
-                            <Col md={3}>
-                                <Label>Payment Status</Label>
-                                <Input
-                                    type="select"
-                                    value={filters.paymentStatus}
-                                    onChange={(e) => handleFilterChange('paymentStatus', e.target.value)}
-                                >
-                                    <option value="">All Payment Statuses</option>
-                                    {paymentStatuses.map(status => (
-                                        <option key={status} value={status}>{status}</option>
-                                    ))}
-                                </Input>
-                            </Col>
-
                             {/* Start Date */}
                             <Col md={3}>
                                 <Label>Start Date</Label>
@@ -771,33 +735,6 @@ function Order() {
                                     value={filters.endDate}
                                     onChange={(e) => handleFilterChange('endDate', e.target.value)}
                                 />
-                            </Col>
-
-                            {/* Sort By */}
-                            <Col md={3}>
-                                <Label>Sort By</Label>
-                                <Input
-                                    type="select"
-                                    value={filters.sortBy}
-                                    onChange={(e) => handleFilterChange('sortBy', e.target.value)}
-                                >
-                                    <option value="date">Date</option>
-                                    <option value="total">Total Amount</option>
-                                    <option value="status">Status</option>
-                                </Input>
-                            </Col>
-
-                            {/* Sort Order */}
-                            <Col md={3}>
-                                <Label>Sort Order</Label>
-                                <Input
-                                    type="select"
-                                    value={filters.order}
-                                    onChange={(e) => handleFilterChange('order', e.target.value)}
-                                >
-                                    <option value="desc">Descending</option>
-                                    <option value="asc">Ascending</option>
-                                </Input>
                             </Col>
                         </Row>
 

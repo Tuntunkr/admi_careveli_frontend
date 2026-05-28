@@ -7,7 +7,7 @@ export const STORE_FRONT_URL = process.env.REACT_APP_STORE_URL || "https://www.c
 export const SHIPCLUES_API_URL = process.env.REACT_APP_SHIPCLUES_API_URL || "https://api.shipclues.in";
 export const SHIPCLUES_API_TOKEN =
     process.env.REACT_APP_SHIPCLUES_API_TOKEN ||
-    "01386cc5ab8a98edaa8f52902c25189013733a7923c2867deee5b05d49e44b81";
+    '34c80487540732968a3f7edf9ca551b7f0f807473709cd2e44a27823d7cdf8fd';
 export const SHIPCLUES_WAREHOUSE_ID = Number(process.env.REACT_APP_SHIPCLUES_WAREHOUSE_ID || 15642);
 
 export const SHIPCLUES_DEFAULTS = {

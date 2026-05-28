@@ -33,6 +33,27 @@ function formatPhone(phone) {
     return s;
 }
 
+/** Treat row as Admin (handles API casing / flags). */
+function isRowAdmin(row) {
+    if (!row || typeof row !== 'object') return false;
+    if (row.isAdmin === true || row.isAdmin === 'true' || row.isAdmin === 1) return true;
+    const raw = row.role ?? row.userRole ?? row.roleName ?? '';
+    const r = String(raw).trim().toLowerCase();
+    return r === 'admin' || r === 'superadmin' || r === 'super_admin';
+}
+
+function matchesRoleSelection(row, roleFilter) {
+    if (!roleFilter) return true;
+    if (roleFilter === 'Admin') return isRowAdmin(row);
+    return !isRowAdmin(row); // User = non-admin
+}
+
+function roleBadgeLabel(row) {
+    const raw = row?.role ?? row?.userRole;
+    if (raw != null && String(raw).trim() !== '') return String(raw).trim();
+    return isRowAdmin(row) ? 'Admin' : 'User';
+}
+
 function UserDetailsContent({ user: row }) {
     if (!row) return null;
 
@@ -49,8 +70,8 @@ function UserDetailsContent({ user: row }) {
                 <div>
                     <h5 className="mb-1 fw-bold">{name}</h5>
                     <div className="d-flex flex-wrap gap-2">
-                        <span className={`badge rounded-pill ${row.role === 'Admin' ? 'bg-danger' : 'bg-primary'}`}>
-                            {row.role || 'User'}
+                        <span className={`badge rounded-pill ${isRowAdmin(row) ? 'bg-danger' : 'bg-primary'}`}>
+                            {roleBadgeLabel(row)}
                         </span>
                         <span className={`badge rounded-pill ${row.isActive !== false ? 'bg-success' : 'bg-secondary'}`}>
                             {row.isActive !== false ? 'Active' : 'Inactive'}
@@ -178,12 +199,17 @@ function Registered() {
     const [debouncedSearch, setDebouncedSearch] = useState('');
     const [viewUser, setViewUser] = useState(null);
 
+    const displayRows = useMemo(
+        () => data.filter(row => matchesRoleSelection(row, roleFilter)),
+        [data, roleFilter]
+    );
+
     const pageStats = useMemo(() => {
-        const activeOnPage = data.filter(u => u.isActive !== false).length;
-        const adminsOnPage = data.filter(u => u.role === 'Admin').length;
-        const withOrders = data.filter(u => (u?.activity?.totalOrdersCount ?? 0) > 0).length;
+        const activeOnPage = displayRows.filter(u => u.isActive !== false).length;
+        const adminsOnPage = displayRows.filter(u => isRowAdmin(u)).length;
+        const withOrders = displayRows.filter(u => (u?.activity?.totalOrdersCount ?? 0) > 0).length;
         return { activeOnPage, adminsOnPage, withOrders };
-    }, [data]);
+    }, [displayRows]);
 
     const hasActiveFilters = Boolean(debouncedSearch || roleFilter || perPage !== 10);
 
@@ -260,8 +286,8 @@ function Registered() {
             name: 'Role',
             width: '88px',
             cell: row => (
-                <span className={`badge rounded-pill ${row.role === 'Admin' ? 'bg-danger' : 'bg-primary'}`}>
-                    {row.role || 'User'}
+                <span className={`badge rounded-pill ${isRowAdmin(row) ? 'bg-danger' : 'bg-primary'}`}>
+                    {roleBadgeLabel(row)}
                 </span>
             ),
         },
@@ -285,23 +311,6 @@ function Registered() {
                     <span className="small text-nowrap" title={m.format('DD MMM YYYY, hh:mm A')}>
                         {m.format('DD MMM YYYY')}
                     </span>
-                );
-            },
-        },
-        {
-            name: 'Activity',
-            width: '110px',
-            cell: row => {
-                const orders = row?.activity?.totalOrdersCount ?? 0;
-                const spent = row?.activity?.totalPaymentAmount ?? 0;
-                return (
-                    <div className="small">
-                        <div>
-                            <i className="ri-shopping-bag-line me-1 text-muted" />
-                            {orders} {orders === 1 ? 'order' : 'orders'}
-                        </div>
-                        <div className="text-success fw-medium">₹{spent}</div>
-                    </div>
                 );
             },
         },
@@ -335,7 +344,10 @@ function Registered() {
 
         const params = { page: currentPage, limit: perPage };
         if (debouncedSearch.trim()) params.search = debouncedSearch.trim();
-        if (roleFilter) params.role = roleFilter;
+        if (roleFilter) {
+            params.role = roleFilter;
+            params.userRole = roleFilter;
+        }
 
         try {
             const res = await getAllUsers(token, params);
@@ -374,7 +386,7 @@ function Registered() {
 
     useEffect(() => {
         setCurrentPage(1);
-    }, [debouncedSearch]);
+    }, [debouncedSearch, roleFilter]);
 
     useEffect(() => {
         fetchUsers();
@@ -389,16 +401,16 @@ function Registered() {
     };
 
     const exportCsv = () => {
-        if (!data.length) {
+        if (!displayRows.length) {
             toast.warning('No users on this page to export');
             return;
         }
         const header = ['Name', 'Email', 'Mobile', 'Role', 'Status', 'Joined', 'Orders', 'Total Spent'];
-        const rows = data.map(row => [
+        const rows = displayRows.map(row => [
             row.name || row.userName || '',
             row.email || row.emailId || '',
             row.phone || row.mobile || '',
-            row.role || 'User',
+            row.role || roleBadgeLabel(row),
             row.isActive !== false ? 'Active' : 'Inactive',
             row.createdAt ? moment(row.createdAt).format('YYYY-MM-DD') : '',
             row?.activity?.totalOrdersCount ?? 0,
@@ -455,7 +467,7 @@ function Registered() {
                         </p>
                     </div>
                     <div className="d-flex gap-2">
-                        <Button variant="outline-secondary" size="sm" onClick={exportCsv} disabled={!data.length}>
+                        <Button variant="outline-secondary" size="sm" onClick={exportCsv} disabled={!displayRows.length}>
                             <i className="ri-download-2-line me-1" />
                             Export CSV
                         </Button>
@@ -605,7 +617,7 @@ function Registered() {
                         <div className="registered-users-table-wrap mb-0">
                             <DataTable
                                 columns={columns}
-                                data={data}
+                                data={displayRows}
                                 progressPending={loading && totalUsers > 0}
                                 progressComponent={<DataTableSkeleton rows={8} columns={8} />}
                                 pagination={false}
@@ -632,6 +644,12 @@ function Registered() {
                         <div className="registered-users-footer d-flex flex-wrap align-items-center justify-content-between gap-3">
                             <span className="text-muted small">
                                 Showing <strong>{rangeStart}–{rangeEnd}</strong> of <strong>{totalUsers}</strong> users
+                                {roleFilter && (
+                                    <>
+                                        {' '}
+                                        · <strong>{displayRows.length}</strong> match <strong>{roleFilter}</strong> on this page
+                                    </>
+                                )}
                                 {totalPages > 1 && (
                                     <> · Page <strong>{currentPage}</strong> of <strong>{totalPages}</strong></>
                                 )}
