@@ -10,6 +10,7 @@ export const ADMIN_PAGE_META = {
     '/testimonial': { title: 'Testimonials', section: 'Content' },
     '/newsletter': { title: 'Newsletter', section: 'Marketing' },
     '/blog-editor': { title: 'Blog Management', section: 'Content' },
+    '/affiliate-users': { title: 'Affiliate Users', section: 'Users' },
     '/marketing-links': { title: 'Marketing Links', section: 'Marketing' },
     '/payment-history': { title: 'Payment History', section: 'Marketing' },
     '/registered': { title: 'Registered Users', section: 'Users' },

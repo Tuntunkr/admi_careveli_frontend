@@ -20,6 +20,7 @@ import Newsletter from "../pages/Newsletter";
 import Order from "../pages/Order";
 import Testimonial from "../pages/Testimonial";
 import MarketingLinks from "../pages/Marketing/MarketingLinks";
+import AffiliateUsers from "../pages/Marketing/AffiliateUsers";
 import PaymentHistory from "../pages/Payment/PaymentHistory";
 import SpotlightManagement from "../pages/Spotlight";
 
@@ -41,6 +42,7 @@ const protectedRoutes = [
   { path: "/order", element: <Order /> },
   { path: "/testimonial", element: <Testimonial /> },
   { path: "/marketing-links", element: <MarketingLinks /> },
+  { path: "/affiliate-users", element: <AffiliateUsers /> },
   { path: "/payment-history", element: <PaymentHistory /> },
   { path: "/spotlight", element: <SpotlightManagement /> }
 ];

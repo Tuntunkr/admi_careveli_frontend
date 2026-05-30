@@ -4,19 +4,21 @@ import { Link } from "react-router-dom";
 import { useSelector } from "react-redux";
 import Footer from "../../layouts/Footer";
 import Header from "../../layouts/Header";
-// import { toast } from 'react-toastify';
-// import { getDashboardSummary, getChartAnalytics } from '../../helper/analytics_helper';
-// import { getAllOrders } from '../../helper/order_helper';
+import { toast } from 'react-toastify';
+import { getDashboardSummary, getChartAnalytics } from '../../helper/analytics_helper';
+import { getAllOrders } from '../../helper/order_helper';
 import { formatCurrency as formatOrderCurrency, getStatusBadgeColor } from '../../helper/order_helper';
 import AnalyticsDashboardSkeleton from '../../components/AnalyticsDashboardSkeleton';
 import DashboardStatCard, {
     mergeAdminOverviewIntoStats,
     useAdminOverviewStats,
+    getAdminDashboardToken,
 } from '../../components/dashboard/DashboardStatCard';
 import {
     buildDashboardMetrics,
     TIME_FILTER_LABELS,
-    getMockDashboardPreview,
+    FILTER_TO_CHART_INTERVAL,
+    buildDashboardPayloadFromApis,
 } from '../../Utils/analyticsDashboard';
 import '../../assets/css/admin-dashboard.css';
 import {
@@ -39,10 +41,10 @@ const PIE_COLORS = {
 };
 
 const QUICK_ACTIONS = [
-    { label: 'Orders', icon: 'ri-shopping-cart-2-line', path: '/order', color: '#EA580C', bg: '#FFEDD5', countKey: 'totalOrders' },
     { label: 'Products', icon: 'ri-shopping-bag-line', path: '/product', color: '#2563EB', bg: '#DBEAFE', countKey: 'totalProducts' },
-    { label: 'Customers', icon: 'ri-group-line', path: '/registered', color: '#9333EA', bg: '#F3E8FF', countKey: 'totalUsers' },
-    { label: 'Banners', icon: 'ri-image-2-line', path: '/banner', color: '#16A34A', bg: '#DCFCE7', countKey: 'totalBanners' },
+    { label: 'Affiliate Users', icon: 'ri-user-star-line', path: '/affiliate-users', color: '#9333EA', bg: '#F3E8FF' },
+    { label: 'Marketing Links', icon: 'ri-links-line', path: '/marketing-links', color: '#0D9488', bg: '#CCFBF1' },
+    { label: 'Payment History', icon: 'ri-money-dollar-circle-line', path: '/payment-history', color: '#16A34A', bg: '#DCFCE7' },
 ];
 
 const KPI_ACCENTS = ['#16A34A', '#EA580C', '#2563EB', '#9333EA'];
@@ -55,8 +57,6 @@ const EmptyTableRow = ({ colSpan, message }) => (
     </tr>
 );
 
-const USE_MOCK_DATA = true; // Set false when API is ready
-
 export default function AdminDashboard() {
     const user = useSelector(state => state.user);
     const { overview, loading: overviewLoading, error: overviewError } = useAdminOverviewStats();
@@ -64,13 +64,11 @@ export default function AdminDashboard() {
     const currentSkin = localStorage.getItem('skin-mode') ? 'dark' : '';
     const [skin, setSkin] = useState(currentSkin);
     const [loading, setLoading] = useState(true);
-    const [showPreviewBanner, setShowPreviewBanner] = useState(
-        () => localStorage.getItem('dashboard-preview-dismissed') !== '1'
-    );
     const [stats, setStats] = useState(null);
     const [recentOrders, setRecentOrders] = useState([]);
     const [timeFilter, setTimeFilter] = useState('last30days');
     const [lastRefreshed, setLastRefreshed] = useState(null);
+    const [fetchError, setFetchError] = useState(null);
 
     const switchSkin = (mode) => {
         if (mode === 'dark') {
@@ -120,42 +118,70 @@ export default function AdminDashboard() {
         });
     };
 
-    const fetchAnalytics = async (_filter = timeFilter, silent = false) => {
+    const fetchAnalytics = async (filter = timeFilter, silent = false) => {
         if (!silent) setLoading(true);
+        setFetchError(null);
+
+        const interval = FILTER_TO_CHART_INTERVAL[filter] || 'monthly';
+        const token = getAdminDashboardToken(user);
 
         try {
-            if (USE_MOCK_DATA) {
-                await new Promise(resolve => setTimeout(resolve, 700));
-                const mock = getMockDashboardPreview('monthly');
-                setStats(mock.stats);
-                setRecentOrders(mock.recentOrders);
-            } else {
-                // const token = user?.token || localStorage.getItem('adminToken');
-                // const [summaryData, chartAnalytics, ordersResponse] = await Promise.all([
-                //     getDashboardSummary(filter),
-                //     getChartAnalytics(interval),
-                //     token
-                //         ? getAllOrders(token, { page: 1, limit: 5, sortBy: 'date', order: 'desc' })
-                //         : Promise.resolve(null),
-                // ]);
-                // if (summaryData?.success) setStats(summaryData.data);
-                // if (chartAnalytics?.success) {
-                //     setChartData((chartAnalytics.data || []).map(item => ({
-                //         name: formatChartLabel(item._id),
-                //         Sales: item.totalSales || 0,
-                //         Revenue: item.totalRevenue || 0,
-                //         Orders: item.totalOrders || item.totalSales || 0,
-                //     })));
-                // }
-                // if (ordersResponse?.success) {
-                //     const orders = ordersResponse.orders || ordersResponse.data?.orders || [];
-                //     setRecentOrders(orders.slice(0, 5));
-                // }
+            const [summaryResult, chartsResult, ordersResult] = await Promise.allSettled([
+                getDashboardSummary(filter),
+                getChartAnalytics(interval, filter),
+                token
+                    ? getAllOrders(token, { page: 1, limit: 5, sortBy: 'date', order: 'desc' })
+                    : Promise.resolve(null),
+            ]);
+
+            if (summaryResult.status === 'rejected') {
+                throw summaryResult.reason;
             }
+
+            const summaryRes = summaryResult.value;
+            const chartsRes =
+                chartsResult.status === 'fulfilled' ? chartsResult.value : null;
+            const ordersRes =
+                ordersResult.status === 'fulfilled' ? ordersResult.value : null;
+
+            if (chartsResult.status === 'rejected') {
+                toast.warn(
+                    chartsResult.reason?.message || 'Charts analytics could not be loaded'
+                );
+            } else if (chartsRes?.success === false) {
+                toast.warn(chartsRes?.message || 'Charts analytics could not be loaded');
+            }
+
+            const payload = buildDashboardPayloadFromApis(summaryRes, chartsRes);
+
+            if (!payload && summaryRes?.success === false) {
+                throw new Error(summaryRes?.message || 'Failed to load dashboard summary');
+            }
+
+            if (!payload) {
+                throw new Error('Invalid analytics summary response');
+            }
+
+            setStats(payload.stats);
+
+            let orders = payload.recentOrders || [];
+            if (ordersRes?.success) {
+                const fromApi =
+                    ordersRes.orders ||
+                    ordersRes.data?.orders ||
+                    (Array.isArray(ordersRes.data) ? ordersRes.data : []);
+                if (fromApi.length) orders = fromApi.slice(0, 5);
+            }
+            setRecentOrders(orders);
 
             setLastRefreshed(new Date());
         } catch (error) {
             console.error('Error loading dashboard:', error);
+            const message = error?.message || 'Failed to load analytics';
+            setFetchError(message);
+            toast.error(message);
+            setStats(null);
+            setRecentOrders([]);
         } finally {
             if (!silent) setLoading(false);
         }
@@ -233,24 +259,6 @@ export default function AdminDashboard() {
             <Header onSkin={setSkin} />
             <div className="main main-app p-3 p-lg-4 analytics-dashboard">
                 {/* Header */}
-                {USE_MOCK_DATA && showPreviewBanner && (
-                    <div className="alert alert-info py-2 px-3 mb-3 small d-flex align-items-center justify-content-between gap-2">
-                        <span className="d-flex align-items-center gap-2">
-                            <i className="ri-information-line"></i>
-                            Preview mode — showing sample data (API disabled for client demo).
-                        </span>
-                        <button
-                            type="button"
-                            className="btn-close btn-close-sm"
-                            aria-label="Dismiss"
-                            onClick={() => {
-                                localStorage.setItem('dashboard-preview-dismissed', '1');
-                                setShowPreviewBanner(false);
-                            }}
-                        />
-                    </div>
-                )}
-
                 <div className="d-md-flex align-items-center justify-content-between mb-4">
                     <div>
                         <h4 className="main-title mb-0">Analytics Dashboard</h4>
@@ -286,6 +294,13 @@ export default function AdminDashboard() {
                         </Button>
                     </div>
                 </div>
+
+                {fetchError && (
+                    <div className="alert alert-danger py-2 px-3 mb-3 small" role="alert">
+                        <i className="ri-error-warning-line me-2" />
+                        {fetchError}
+                    </div>
+                )}
 
                 {overviewError && (
                     <div className="alert alert-warning py-2 px-3 mb-3 small" role="status">
@@ -373,9 +388,14 @@ export default function AdminDashboard() {
                                                 </div>
                                                 <div className="flex-grow-1 min-w-0">
                                                     <span className="fw-semibold text-dark d-block">{action.label}</span>
-                                                    <span className="badge rounded-pill mt-1" style={{ backgroundColor: action.bg, color: action.color }}>
-                                                        {metrics[action.countKey] ?? '—'}
-                                                    </span>
+                                                    {action.countKey != null && (
+                                                        <span
+                                                            className="badge rounded-pill mt-1"
+                                                            style={{ backgroundColor: action.bg, color: action.color }}
+                                                        >
+                                                            {metrics[action.countKey] ?? '—'}
+                                                        </span>
+                                                    )}
                                                 </div>
                                                 <i className="ri-arrow-right-s-line ms-auto text-secondary"></i>
                                             </Card.Body>

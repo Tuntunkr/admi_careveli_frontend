@@ -1,7 +1,7 @@
 export const projectName = "Careveli";
 export const themeColor = "#f23636";
-export const API_URL = "https://careevali-backend.vercel.app/api/";
-export const BASE_URL = "https://careevali-backend.vercel.app/";
+export const API_URL = "https://careveli-backend.vercel.app/api/";
+export const BASE_URL = "https://careveli-backend.vercel.app/";
 export const STORE_FRONT_URL = process.env.REACT_APP_STORE_URL || "https://www.careveli.com";
 
 export const SHIPCLUES_API_URL = process.env.REACT_APP_SHIPCLUES_API_URL || "https://api.shipclues.in";

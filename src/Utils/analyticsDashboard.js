@@ -77,6 +77,96 @@ export const TIME_FILTER_LABELS = {
     thisYear: 'This Year',
 };
 
+/** Map dashboard time filter → charts API interval */
+export const FILTER_TO_CHART_INTERVAL = {
+    today: 'daily',
+    last7days: 'daily',
+    last30days: 'weekly',
+    thisYear: 'monthly',
+};
+
+/**
+ * Normalize GET /api/analytics/summary response into dashboard stats shape.
+ */
+export const normalizeAnalyticsSummary = (res) => {
+    if (!res) return null;
+
+    const data = res?.data ?? res;
+    if (!data || typeof data !== 'object' || Array.isArray(data)) return null;
+
+    if (data.summary || data.orderStatus || data.paymentStatus) {
+        return {
+            summary: data.summary || {},
+            orderStatus: data.orderStatus || [],
+            paymentStatus: data.paymentStatus || [],
+            topProducts: data.topProducts || [],
+            lowStockAlerts: data.lowStockAlerts || data.lowStock || [],
+            userActivity: data.userActivity || { active: 0, inactive: 0 },
+            recentOrders: data.recentOrders || [],
+        };
+    }
+
+    return {
+        summary: {
+            totalUsers: data.totalUsers ?? 0,
+            totalProducts: data.totalProducts ?? 0,
+            totalBanners: data.totalBanners ?? 0,
+            totalOrders: data.totalOrders ?? 0,
+            totalRevenue: data.totalRevenue ?? data.revenue ?? 0,
+            activeProducts: data.activeProducts ?? 0,
+        },
+        orderStatus: data.orderStatus || [],
+        paymentStatus: data.paymentStatus || [],
+        topProducts: data.topProducts || [],
+        lowStockAlerts: data.lowStockAlerts || data.lowStock || [],
+        userActivity: data.userActivity || {
+            active: data.activeUsers ?? 0,
+            inactive: data.inactiveUsers ?? 0,
+        },
+        recentOrders: data.recentOrders || [],
+    };
+};
+
+/**
+ * Normalize GET /api/analytics/charts response for Recharts / metrics.
+ */
+export const normalizeAnalyticsCharts = (res) => {
+    if (!res) return [];
+
+    const raw = res?.data ?? res;
+    const list = Array.isArray(raw)
+        ? raw
+        : raw?.charts || raw?.series || raw?.items || [];
+
+    if (!Array.isArray(list)) return [];
+
+    return list.map((item) => ({
+        name: formatChartLabel(item._id || item.name || item.label || item.period),
+        Sales: Number(item.totalSales ?? item.sales ?? item.count ?? 0) || 0,
+        Revenue: Number(item.totalRevenue ?? item.revenue ?? item.amount ?? 0) || 0,
+        Orders: Number(item.totalOrders ?? item.orders ?? item.totalSales ?? 0) || 0,
+    }));
+};
+
+/**
+ * Build combined dashboard payload from summary + charts API responses.
+ */
+export const buildDashboardPayloadFromApis = (summaryRes, chartsRes) => {
+    const stats = normalizeAnalyticsSummary(summaryRes);
+    const chartData = normalizeAnalyticsCharts(chartsRes);
+
+    if (!stats) return null;
+
+    return {
+        stats: {
+            ...stats,
+            chartSeries: chartData,
+        },
+        chartData,
+        recentOrders: stats.recentOrders || [],
+    };
+};
+
 /** Frontend preview — replace with API when backend is ready */
 export const MOCK_DASHBOARD_STATS = {
     summary: {

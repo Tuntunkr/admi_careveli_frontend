@@ -158,6 +158,9 @@ class SidebarMenu extends Component {
                         <li className="nav-item">
                             <NavLink to="/registered" className="nav-link"><i className={"fa fa-registered"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>REGISTERED USERS</span></NavLink>
                         </li>
+                        <li className="nav-item">
+                            <NavLink to="/affiliate-users" className="nav-link"><i className={"ri-user-star-line"} style={{ fontSize: 16 }}></i> <span style={{ userSelect: 'none' }}>AFFILIATE USERS</span></NavLink>
+                        </li>
                     </ul>
                 </div>
 
